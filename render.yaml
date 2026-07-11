@@ -1,0 +1,33 @@
+# Render blueprint for the API. Point Render at this repo and it reads this file.
+services:
+  - type: web
+    name: bsg-ats-api
+    runtime: node
+    rootDir: server
+    plan: starter          # 'free' works, but sleeps after 15 min idle — first request is slow
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL          # paste the Neon pooled connection string
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: PUBLIC_WEB_URL        # https://careers.bharatsteels.in
+        sync: false
+      - key: WEB_ORIGINS           # same, comma-separated if more than one
+        sync: false

@@ -1,0 +1,23 @@
+{
+  "name": "Bharat Steel ATS",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+
+  "features": {
+    "ghcr.io/itsmechlark/features/postgresql:1": { "version": "16" }
+  },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postAttachCommand": "bash .devcontainer/start.sh",
+
+  "forwardPorts": [4000, 5173],
+  "portsAttributes": {
+    "5173": { "label": "ATS (open this one)", "onAutoForward": "openPreview" },
+    "4000": { "label": "API", "onAutoForward": "silent" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  }
+}

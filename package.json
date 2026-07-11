@@ -1,0 +1,12 @@
+{
+  "name": "bsg-ats",
+  "private": true,
+  "scripts": {
+    "start": "concurrently -n api,web -c blue,magenta \"npm --prefix server run dev\" \"npm --prefix web run dev\"",
+    "setup": "bash .devcontainer/setup.sh",
+    "db:init": "npm --prefix server run db:init"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
