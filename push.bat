@@ -86,16 +86,41 @@ echo.
 git push -u origin main
 if errorlevel 1 (
   echo.
-  echo  [X] Push failed. The usual causes:
+  echo  ------------------------------------------------
+  echo   Push was rejected.
+  echo  ------------------------------------------------
   echo.
-  echo      - The GitHub repo is not empty. Delete it and make a fresh one,
-  echo        with no README and no .gitignore ticked.
-  echo      - Sign-in was cancelled. Run this again.
-  echo      - Wrong URL. Fix it with:
-  echo            git remote set-url origin https://github.com/you/bharat-steel-ats
+  echo  The usual cause: GitHub created the repo with a README
+  echo  or a .gitignore, so it is not empty, and git will not
+  echo  overwrite something it thinks you have not seen.
   echo.
-  pause
-  exit /b 1
+  echo  If that repo has nothing in it you care about - only the
+  echo  README GitHub added for you - it is safe to overwrite.
+  echo.
+  set "FORCE="
+  set /p FORCE="  Overwrite what is on GitHub with this folder? (y/N): "
+  if /i "!FORCE!"=="y" (
+    echo.
+    echo  Overwriting...
+    git push -u origin main --force
+    if errorlevel 1 (
+      echo.
+      echo  [X] Still failing. Other things to check:
+      echo        - Sign-in cancelled? Run this again.
+      echo        - Wrong URL? Fix it with:
+      echo            git remote set-url origin https://github.com/you/bharat-steel-ats
+      echo.
+      pause
+      exit /b 1
+    )
+  ) else (
+    echo.
+    echo  Nothing was pushed. Delete the repo on GitHub and create a
+    echo  fresh one with NOTHING ticked, then run this again.
+    echo.
+    pause
+    exit /b 1
+  )
 )
 
 echo.
