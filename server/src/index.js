@@ -1,3 +1,4 @@
+import 'express-async-errors'; // must come before the routes are imported
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -7,6 +8,7 @@ import applicationRoutes from './routes/applications.js';
 import { employees, jobs, users } from './routes/admin.js';
 import { describeStorage } from './services/storage.js';
 import { isInitialised, initDb } from './init-db.js';
+import { q } from './db.js';
 
 dotenv.config();
 
@@ -19,9 +21,26 @@ const origins = (process.env.WEB_ORIGINS || '').split(',').map((o) => o.trim()).
 app.use(cors({ origin: origins.length ? origins : true }));
 app.use(express.json({ limit: '2mb' }));
 
-app.get('/api/health', (_req, res) =>
-  res.json({ ok: true, ai: Boolean(process.env.ANTHROPIC_API_KEY), storage: describeStorage() })
-);
+app.get('/api/health', async (_req, res) => {
+  const health = {
+    ok: true,
+    ai: Boolean(process.env.ANTHROPIC_API_KEY),
+    storage: describeStorage(),
+    database: 'unknown',
+    users: null,
+  };
+  // A health check that does not touch the database is not a health check.
+  try {
+    const { rows } = await q('SELECT count(*)::int AS n FROM users');
+    health.database = 'connected';
+    health.users = rows[0].n;
+    if (rows[0].n === 0) health.ok = false;
+  } catch (err) {
+    health.ok = false;
+    health.database = err.code === '42P01' ? 'connected, but no tables' : `unreachable — ${err.message}`;
+  }
+  res.status(health.ok ? 200 : 503).json(health);
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/applications', applicationRoutes);
@@ -29,11 +48,23 @@ app.use('/api/employees', employees);
 app.use('/api/jobs', jobs);
 app.use('/api/users', users);
 
-// Multer and unexpected failures land here, so the UI always gets a readable message.
-app.use((err, _req, res, _next) => {
-  console.error(err);
+// Every failure lands here — including rejected promises, thanks to express-async-errors —
+// so the browser always gets a readable reason instead of a blank 500.
+app.use((err, req, res, _next) => {
+  console.error(`✗ ${req.method} ${req.path} —`, err.message);
+
   const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 400 : 500);
-  res.status(status).json({ error: err.message || 'Something went wrong on the server.' });
+
+  // Postgres speaks in codes. Translate the ones that actually happen in practice.
+  let message = err.message || 'Something went wrong on the server.';
+  if (err.code === '42P01')
+    message = 'The database has no tables yet. Restart the API — it creates them on an empty database.';
+  else if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND')
+    message = 'The API cannot reach the database. Check DATABASE_URL.';
+  else if (err.code === '28P01')
+    message = 'The database rejected the API password. Check DATABASE_URL.';
+
+  res.status(status).json({ error: message });
 });
 
 /**
