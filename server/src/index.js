@@ -6,6 +6,7 @@ import publicRoutes from './routes/public.js';
 import applicationRoutes from './routes/applications.js';
 import { employees, jobs, users } from './routes/admin.js';
 import { describeStorage } from './services/storage.js';
+import { isInitialised, initDb } from './init-db.js';
 
 dotenv.config();
 
@@ -35,5 +36,38 @@ app.use((err, _req, res, _next) => {
   res.status(status).json({ error: err.message || 'Something went wrong on the server.' });
 });
 
+/**
+ * On a fresh database, create the tables and seed the companies and logins automatically.
+ * This is what lets the whole thing be deployed from a web dashboard with no terminal.
+ *
+ * It only ever fires when the database is EMPTY — `isInitialised()` checks for the companies
+ * table first. It will never wipe a database that already has candidates in it.
+ */
+async function bootstrap() {
+  try {
+    if (await isInitialised()) {
+      console.log('Database ready.');
+      return;
+    }
+    console.log('Empty database — creating tables and seed data…');
+    const { password } = await initDb();
+    console.log('');
+    console.log('  ┌──────────────────────────────────────────────────────┐');
+    console.log('  │  Set up. Sign in with:                               │');
+    console.log('  │    superadmin@bharatsteels.in                        │');
+    console.log(`  │    ${String(password).padEnd(50)}│`);
+    console.log('  │                                                      │');
+    console.log('  │  CHANGE THIS PASSWORD IMMEDIATELY.                   │');
+    console.log('  └──────────────────────────────────────────────────────┘');
+    console.log('');
+  } catch (err) {
+    console.error('Could not reach the database:', err.message);
+    console.error('Check DATABASE_URL. The API will start, but nothing will work until this is fixed.');
+  }
+}
+
 const port = process.env.PORT || 4000;
-app.listen(port, () => console.log(`ATS API on http://localhost:${port}`));
+app.listen(port, async () => {
+  console.log(`ATS API listening on ${port}`);
+  await bootstrap();
+});

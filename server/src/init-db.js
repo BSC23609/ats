@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
-import { pool, q } from './db.js';
+import { pool, q, one } from './db.js';
 
 dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,10 +15,19 @@ const COMPANIES = [
   ['G2', 'G2 (Group Services)', '#6B4EA8', 'Chennai, Tamil Nadu', null],
 ];
 
-const run = async () => {
+/** Has this database been set up already? */
+export async function isInitialised() {
+  const row = await one(`SELECT to_regclass('public.companies') AS t`);
+  return Boolean(row?.t);
+}
+
+/**
+ * Creates every table and seeds the four companies, five logins and four sample openings.
+ * DESTRUCTIVE — schema.sql drops the tables first. Only ever called when the database is empty.
+ */
+export async function initDb() {
   const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   await q(sql);
-  console.log('schema created');
 
   for (const [code, name, colour, address, website] of COMPANIES) {
     await q('INSERT INTO companies (code, name, colour, address, website) VALUES ($1,$2,$3,$4,$5)',
@@ -34,8 +43,8 @@ const run = async () => {
     [hash]
   );
 
-  // One HR admin per company to start with. Any of them can be given more companies later,
-  // and one admin can hold all four — the super admin decides on the HR admins page.
+  // One HR admin per company to begin with. The super admin can give any of them more
+  // companies later — one person can hold all four.
   for (const [code] of COMPANIES) {
     const { rows } = await q(
       `INSERT INTO users (name, email, password_hash, role)
@@ -56,13 +65,22 @@ const run = async () => {
       ((SELECT id FROM companies WHERE code='BSC'), 'Sales Executive - Steel', 'Sales', 'Chennai', 1, 'TMT and structural steel dealer sales.'),
       ((SELECT id FROM companies WHERE code='CRAYON'), 'Stores Executive', 'Stores', 'Chennai', 2, 'Roofing sheet and accessories inventory control.')`);
 
+  return { password, companies: COMPANIES.map(([c]) => c) };
+}
+
+/** `npm run db:init` — run by hand, from a terminal. */
+const runFromCli = async () => {
+  const { password } = await initDb();
   console.log(`\nSeeded. Every user password: ${password}`);
   console.log('  superadmin@bharatsteels.in       (SUPER_ADMIN — all companies)');
   COMPANIES.forEach(([c]) => console.log(`  hr.${c.toLowerCase()}@bharatsteels.in`.padEnd(35) + `(HR_ADMIN — ${c})`));
   await pool.end();
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// Only run when invoked directly, not when imported by the server.
+if (process.argv[1] && process.argv[1].endsWith('init-db.js')) {
+  runFromCli().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
