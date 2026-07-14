@@ -10,6 +10,8 @@ export default function Jobs() {
   const [desc, setDesc] = useState('');        // the rich-text job description
   const [editing, setEditing] = useState(null); // the opening whose description is being edited
   const [jd, setJd] = useState(null);          // the opening whose JD is being uploaded
+  const [doomed, setDoomed] = useState(null);  // the opening being deleted, and its applicant count
+  const [deleting, setDeleting] = useState(false);
   const [jdFile, setJdFile] = useState(null);
   const [jdText, setJdText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -33,6 +35,38 @@ export default function Jobs() {
       load();
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const askDelete = async (j) => {
+    setError('');
+    setMsg('');
+    try {
+      // The first call is a dry run: the server refuses if candidates are attached, and tells us how many.
+      await api.del(`/jobs/${j.id}`);
+      setMsg(`"${j.title}" deleted.`);
+      load();
+    } catch (err) {
+      // 409 means "there are people attached" — show what will happen and let them decide.
+      if (err.applicants) setDoomed({ job: j, applicants: err.applicants });
+      else setError(err.message);
+    }
+  };
+
+  const confirmDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await api.del(`/jobs/${doomed.job.id}?force=true`);
+      setMsg(
+        `"${doomed.job.title}" deleted. ${res.applicants_detached} ` +
+        `${res.applicants_detached === 1 ? 'candidate is' : 'candidates are'} still in the pipeline.`
+      );
+      setDoomed(null);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -87,6 +121,41 @@ export default function Jobs() {
 
       {msg && <div className="success" style={{ marginBottom: 16 }}>{msg}</div>}
       {error && !adding && !jd && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
+
+      {doomed && (
+        <div className="overlay" onClick={(e) => e.target === e.currentTarget && setDoomed(null)}>
+          <div className="dialog" style={{ maxWidth: 480 }} role="dialog" aria-modal="true">
+            <div className="dialog-head">
+              <div>
+                <div className="eyebrow">Delete opening</div>
+                <h2>{doomed.job.title}</h2>
+              </div>
+              <button type="button" className="dialog-close" onClick={() => setDoomed(null)}>&times;</button>
+            </div>
+            <div className="dialog-body">
+              <p style={{ marginTop: 0 }}>
+                <strong>
+                  {doomed.applicants} {doomed.applicants === 1 ? 'candidate has' : 'candidates have'} applied
+                  for this opening.
+                </strong>
+              </p>
+              <p>
+                They stay in the pipeline and keep their resumes, scores and history. What they lose is the link
+                to this opening — the role they applied for remains, as plain text.
+              </p>
+              <div className="note">
+                The job description document is deleted with the opening. Resumes already scored keep their scores.
+              </div>
+            </div>
+            <div className="dialog-foot">
+              <button type="button" className="ghost" onClick={() => setDoomed(null)}>Keep it</button>
+              <button type="button" className="danger" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete anyway'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editing && (
         <div className="overlay" onClick={(e) => e.target === e.currentTarget && setEditing(null)}>
@@ -230,6 +299,12 @@ export default function Jobs() {
                       <button className="ghost small" onClick={() => { setJd(j); setJdText(''); setJdFile(null); setMsg(''); }}>
                         {j.has_jd ? 'Replace JD' : 'Upload JD'}
                       </button>
+                      {user.role === 'SUPER_ADMIN' && (
+                        <button className="ghost small" onClick={() => askDelete(j)}
+                                style={{ color: 'var(--red)', borderColor: 'var(--line)' }}>
+                          Delete
+                        </button>
+                      )}
                       {j.status === 'OPEN'
                         ? <button className="ghost small" onClick={() => setStatus(j, 'CLOSED')}>Close</button>
                         : <button className="ghost small" onClick={() => setStatus(j, 'OPEN')}>Reopen</button>}

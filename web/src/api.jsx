@@ -27,7 +27,14 @@ async function request(path, { method = 'GET', body, form } = {}) {
     return;
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'The server could not complete that request.');
+  if (!res.ok) {
+    // Carry the rest of the payload on the error. Some failures are not simply "no" — a refused
+    // job deletion, for instance, comes back with the number of candidates attached, and the UI
+    // needs that to explain what will happen.
+    const err = new Error(data.error || 'The server could not complete that request.');
+    Object.assign(err, data, { status: res.status });
+    throw err;
+  }
   return data;
 }
 
@@ -35,6 +42,7 @@ export const api = {
   get: (p) => request(p),
   post: (p, body) => request(p, { method: 'POST', body }),
   patch: (p, body) => request(p, { method: 'PATCH', body }),
+  del: (p) => request(p, { method: 'DELETE' }),
   put: (p, body) => request(p, { method: 'PUT', body }),
   upload: (p, form) => request(p, { method: 'POST', form }),
 

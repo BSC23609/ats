@@ -5,7 +5,7 @@ import path from 'path';
 import { one, q, tx } from '../db.js';
 import { requireAuth, requireSuperAdmin, companyFilter, assertCompanyAccess } from '../auth.js';
 import { extractText, summariseResume } from '../services/resume.js';
-import { putFile } from '../services/storage.js';
+import { putFile, deleteFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { syncWorkbook } from '../services/workbook.js';
 import { sanitise } from '../services/html.js';
@@ -116,6 +116,43 @@ jobs.patch('/:id', async (req, res) => {
     [...set.map((k) => (k === 'description' ? sanitise(req.body[k]) : req.body[k])), req.params.id]
   );
   res.json(rows[0]);
+});
+
+/**
+ * Delete an opening. Super admin only — an HR admin can close a role, but removing it outright
+ * takes a record out of the system and that is not theirs to do.
+ *
+ * Candidates who applied are NEVER deleted. If any exist, the call is refused unless ?force=true,
+ * and even then the candidates survive: their link to the opening is cut, and they keep the role
+ * they applied for as plain text. Losing a job posting is an administrative tidy-up; losing a
+ * person's application is data loss.
+ */
+jobs.delete('/:id', requireSuperAdmin, async (req, res) => {
+  const job = await one('SELECT * FROM jobs WHERE id=$1', [req.params.id]);
+  if (!job) return res.status(404).json({ error: 'Opening not found.' });
+
+  const { rows } = await q('SELECT count(*)::int AS n FROM applications WHERE job_id=$1', [job.id]);
+  const applicants = rows[0].n;
+
+  if (applicants > 0 && req.query.force !== 'true') {
+    return res.status(409).json({
+      error:
+        `${applicants} ${applicants === 1 ? 'candidate has' : 'candidates have'} applied for this opening. ` +
+        `They will be kept, but will no longer be linked to it.`,
+      applicants,
+    });
+  }
+
+  await tx(async (client) => {
+    // Cut the link, keep the people.
+    await client.query('UPDATE applications SET job_id=NULL WHERE job_id=$1', [job.id]);
+    await client.query('DELETE FROM jobs WHERE id=$1', [job.id]);
+  });
+
+  // The JD document goes too — it describes a role that no longer exists.
+  if (job.jd_path) await deleteFile(job.jd_path).catch(() => {});
+
+  res.json({ ok: true, applicants_detached: applicants });
 });
 
 export const users = Router();
