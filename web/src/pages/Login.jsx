@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../api.jsx';
-import { GroupLogo } from '../components/Logo.jsx';
+
+const COMPANIES = [
+  ['Bharat Steel (Chennai)', '#0064a0'],
+  ['Metfraa Steel Buildings', '#005a96'],
+  ['Crayon Roofings & Structures', '#466e8c'],
+  ['G2 Steel Services', '#0a6eb4'],
+];
 
 export default function Login() {
   const { user, login, loading } = useAuth();
@@ -23,41 +29,57 @@ export default function Login() {
       navigate('/pipeline');
     } catch (err) {
       setError(err.message);
-    } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="center">
-      <div className="login">
-        <div className="public-head">
-          <GroupLogo className="login-logo" />
-          <div className="sub">Recruitment · HR sign-in</div>
+    <div className="signin">
+      {/* The mark at full size, against ink — not shrunk into the corner of a form. */}
+      <div className="signin-brand">
+        <div>
+          <span className="plate">
+            <img src="/brand/group.png" alt="The Bharat Steel Group" />
+          </span>
+          <div className="signin-lede">Hiring across four companies, in one place.</div>
         </div>
 
-        <form onSubmit={submit} className="panel">
-          <div className="panel-body">
-            {error && <div className="error" style={{ marginBottom: 14 }}>{error}</div>}
-            <div className="field">
-              <label htmlFor="email">Work email</label>
-              <input id="email" type="email" autoComplete="username" value={email}
-                     onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-            <div className="field">
-              <label htmlFor="password">Password</label>
-              <input id="password" type="password" autoComplete="current-password" value={password}
-                     onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-            <button type="submit" disabled={busy} style={{ width: '100%' }}>
-              {busy ? 'Signing in…' : 'Sign in'}
-            </button>
+        <div className="signin-cos">
+          {COMPANIES.map(([name, colour]) => (
+            <span key={name}>
+              <i style={{ background: colour }} />
+              {name}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="signin-form">
+        <form className="inner" onSubmit={submit}>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>Recruitment</div>
+          <h1>Sign in</h1>
+          <p className="lead">For HR admins. Candidates apply through the careers page.</p>
+
+          {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
+
+          <div className="field">
+            <label htmlFor="email">Work email</label>
+            <input id="email" type="email" autoComplete="username" autoFocus
+                   value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+
+          <div className="field">
+            <label htmlFor="password">Password</label>
+            <input id="password" type="password" autoComplete="current-password"
+                   value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+
+          <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+
+          <div className="signin-foot">
+            Applying for a job? <Link to="/careers">See the open roles</Link>
           </div>
         </form>
-
-        <p className="sub" style={{ marginTop: 16, textAlign: 'center' }}>
-          Applying for a job? <Link to="/careers">See open roles</Link>
-        </p>
       </div>
     </div>
   );
