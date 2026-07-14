@@ -22,7 +22,7 @@ function Shell({ children }) {
     <div className="shell">
       <aside className="rail">
         <div className="rail-brand">
-          <GroupLogo className="rail-logo" plate />
+          <GroupLogo className="rail-logo" />
           <div className="sub">Recruitment</div>
         </div>
         <nav>
