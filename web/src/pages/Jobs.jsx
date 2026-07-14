@@ -7,8 +7,9 @@ export default function Jobs() {
   const companies = user.companies || [];
   const [rows, setRows] = useState([]);
   const [adding, setAdding] = useState(false);
-  const [desc, setDesc] = useState('');        // the rich-text job description
-  const [editing, setEditing] = useState(null); // the opening whose description is being edited
+  const [desc, setDesc] = useState('');        // the rich-text description in the create form
+  const [editing, setEditing] = useState(null); // the opening being edited, as a working copy
+  const [saving, setSaving] = useState(false);
   const [jd, setJd] = useState(null);          // the opening whose JD is being uploaded
   const [doomed, setDoomed] = useState(null);  // the opening being deleted, and its applicant count
   const [deleting, setDeleting] = useState(false);
@@ -70,16 +71,36 @@ export default function Jobs() {
     }
   };
 
-  const saveDescription = async () => {
+  const openEdit = (j) => {
+    setError('');
+    setMsg('');
+    setEditing({
+      id: j.id,
+      title: j.title,
+      department: j.department || '',
+      location: j.location || '',
+      employment_type: j.employment_type || 'Full-time',
+      min_experience: j.min_experience ?? 0,
+      max_experience: j.max_experience ?? '',
+      description: j.description || '',
+      status: j.status,
+    });
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
     setError('');
     try {
-      await api.patch(`/jobs/${editing.id}`, { description: desc });
-      setMsg(`Description updated for ${editing.title}.`);
+      const { id, ...body } = editing;
+      await api.patch(`/jobs/${id}`, body);
+      setMsg(`"${editing.title}" updated.`);
       setEditing(null);
-      setDesc('');
       load();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -159,24 +180,86 @@ export default function Jobs() {
 
       {editing && (
         <div className="overlay" onClick={(e) => e.target === e.currentTarget && setEditing(null)}>
-          <div className="dialog" style={{ maxWidth: 760 }} role="dialog" aria-modal="true">
+          <form className="dialog" style={{ maxWidth: 760 }} onSubmit={saveEdit}
+                role="dialog" aria-modal="true">
             <div className="dialog-head">
               <div>
-                <div className="eyebrow">Job description</div>
+                <div className="eyebrow">Edit opening</div>
                 <h2>{editing.title}</h2>
               </div>
               <button type="button" className="dialog-close" onClick={() => setEditing(null)}>&times;</button>
             </div>
+
             <div className="dialog-body">
               {error && <div className="error" style={{ marginBottom: 14 }}>{error}</div>}
-              <RichText value={desc} onChange={setDesc} minHeight={300}
-                        placeholder="Responsibilities, requirements, reporting line…" />
+
+              <div className="field">
+                <label htmlFor="e_title">Role title</label>
+                <input id="e_title" required value={editing.title}
+                       onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
+              </div>
+
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="e_dept">Department</label>
+                  <input id="e_dept" value={editing.department}
+                         onChange={(e) => setEditing({ ...editing, department: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label htmlFor="e_loc">Location</label>
+                  <input id="e_loc" value={editing.location}
+                         onChange={(e) => setEditing({ ...editing, location: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label htmlFor="e_type">Employment type</label>
+                  <select id="e_type" value={editing.employment_type}
+                          onChange={(e) => setEditing({ ...editing, employment_type: e.target.value })}>
+                    <option>Full-time</option>
+                    <option>Contract</option>
+                    <option>Internship</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="e_min">Minimum experience (years)</label>
+                  <input id="e_min" type="number" step="0.5" min="0" value={editing.min_experience}
+                         onChange={(e) => setEditing({ ...editing, min_experience: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label htmlFor="e_max">Maximum experience (years)</label>
+                  <input id="e_max" type="number" step="0.5" min="0" value={editing.max_experience}
+                         placeholder="No limit"
+                         onChange={(e) => setEditing({ ...editing, max_experience: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label htmlFor="e_status">Status</label>
+                  <select id="e_status" value={editing.status}
+                          onChange={(e) => setEditing({ ...editing, status: e.target.value })}>
+                    <option value="OPEN">Open — shown on the careers page</option>
+                    <option value="CLOSED">Closed — hidden from candidates</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>What the role involves</label>
+                <RichText value={editing.description} minHeight={260}
+                          onChange={(html) => setEditing((j) => ({ ...j, description: html }))}
+                          placeholder="Responsibilities, requirements, reporting line…" />
+                <p className="sub" style={{ marginTop: 6 }}>
+                  Changing this does not re-score resumes already in the pipeline. Upload or replace the JD
+                  document to do that.
+                </p>
+              </div>
             </div>
+
             <div className="dialog-foot">
               <button type="button" className="ghost" onClick={() => setEditing(null)}>Cancel</button>
-              <button type="button" onClick={saveDescription}>Save description</button>
+              <button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 
@@ -297,10 +380,7 @@ export default function Jobs() {
                   <td><span className={`chip ${j.status === 'OPEN' ? 'JOINED' : j.status === 'CLOSED' ? 'REJECTED' : 'ON_HOLD'}`}>{j.status}</span></td>
                   <td>
                     <div className="row">
-                      <button className="ghost small"
-                              onClick={() => { setEditing(j); setDesc(j.description || ''); setMsg(''); setError(''); }}>
-                        Description
-                      </button>
+                      <button className="ghost small" onClick={() => openEdit(j)}>Edit</button>
                       <button className="ghost small" onClick={() => { setJd(j); setJdText(''); setJdFile(null); setMsg(''); }}>
                         {j.has_jd ? 'Replace JD' : 'Upload JD'}
                       </button>

@@ -111,7 +111,10 @@ jobs.post('/', async (req, res) => {
 });
 
 jobs.patch('/:id', async (req, res) => {
-  const job = await one('SELECT company_id FROM jobs WHERE id=$1', [req.params.id]);
+  const job = await one(
+    'SELECT company_id, min_experience, max_experience FROM jobs WHERE id=$1',
+    [req.params.id]
+  );
   if (!job) return res.status(404).json({ error: 'Job not found.' });
   if (!assertCompanyAccess(req, res, job.company_id)) return;
 
@@ -119,9 +122,29 @@ jobs.patch('/:id', async (req, res) => {
              'min_experience', 'max_experience', 'description', 'status'];
   const set = f.filter((k) => k in req.body);
   if (!set.length) return res.status(400).json({ error: 'Nothing to update.' });
+
+  // The bounds have to be checked against each other, and either one may be the only one sent —
+  // so fall back to what is already stored before comparing.
+  const min = 'min_experience' in req.body ? Number(req.body.min_experience) || 0 : job.min_experience;
+  const max =
+    'max_experience' in req.body
+      ? req.body.max_experience === '' || req.body.max_experience == null
+        ? null
+        : Number(req.body.max_experience)
+      : job.max_experience;
+  if (max != null && max < min)
+    return res.status(400).json({ error: 'Maximum experience cannot be less than the minimum.' });
+
+  const value = (k) => {
+    if (k === 'description') return sanitise(req.body[k]);
+    if (k === 'max_experience') return max;
+    if (k === 'min_experience') return min;
+    return req.body[k];
+  };
+
   const { rows } = await q(
     `UPDATE jobs SET ${set.map((k, i) => `${k}=$${i + 1}`).join(', ')} WHERE id=$${set.length + 1} RETURNING *`,
-    [...set.map((k) => (k === 'description' ? sanitise(req.body[k]) : req.body[k])), req.params.id]
+    [...set.map(value), req.params.id]
   );
   res.json(rows[0]);
 });
