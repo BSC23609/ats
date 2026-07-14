@@ -29,17 +29,6 @@ CREATE TABLE users (
   password_hash TEXT NOT NULL,
   role          TEXT NOT NULL CHECK (role IN ('SUPER_ADMIN','HR_ADMIN')),
   active        BOOLEAN NOT NULL DEFAULT TRUE,
-
-  -- Outgoing mail. Offer letters are sent FROM the HR admin's own mailbox, so each
-  -- admin stores their own SMTP credentials (Microsoft 365: smtp.office365.com:587,
-  -- with an app password — not the account password).
-  smtp_host     TEXT,
-  smtp_port     INT DEFAULT 587,
-  smtp_user     TEXT,
-  smtp_pass_enc TEXT,                     -- AES-256-GCM, key derived from JWT_SECRET
-  from_email    TEXT,
-  signature     TEXT,                     -- name + designation printed under the offer letter
-
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -114,9 +103,7 @@ CREATE TABLE applications (
   offered_ctc        NUMERIC(12,2),
   offer_designation  TEXT,
   offer_joining_date DATE,
-  offer_letter_path  TEXT,
-  offer_sent_at      TIMESTAMPTZ,
-  offer_sent_by      INT REFERENCES users(id),
+  offer_letter_path  TEXT,                 -- the signed letter, kept for the record
   assigned_to        INT REFERENCES users(id),
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()

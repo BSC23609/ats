@@ -238,10 +238,10 @@ export default function ApplicationDetail() {
     }
   };
 
-  const submitOffer = async (e, send) => {
-    e?.preventDefault();
+  const saveOffer = async (e) => {
+    e.preventDefault();
     if (!offerFile && !app.offer_letter_path)
-      return setError('Attach the signed offer letter PDF first.');
+      return setError('Attach the signed offer letter PDF.');
 
     setBusy(true);
     setError('');
@@ -249,15 +249,12 @@ export default function ApplicationDetail() {
     try {
       const form = new FormData();
       if (offerFile) form.set('offer_letter', offerFile);
-      form.set('send', String(send));
       if (offer.offer_designation) form.set('offer_designation', offer.offer_designation);
       if (offer.offer_joining_date) form.set('offer_joining_date', offer.offer_joining_date);
       if (offer.offered_ctc) form.set('offered_ctc', offer.offered_ctc);
 
-      const res = await api.upload(`/applications/${id}/offer-letter`, form);
-      setMsg(res.sent
-        ? `Offer letter emailed to ${app.email} from ${res.from}. Status moved to Offered.`
-        : 'Offer letter saved against this candidate. Send it whenever you are ready.');
+      await api.upload(`/applications/${id}/offer-letter`, form);
+      setMsg('Offer letter saved. The candidate is now marked Offered.');
       setOfferFile(null);
       load();
     } catch (err) {
@@ -435,75 +432,52 @@ export default function ApplicationDetail() {
           </Section>
 
           <Section title="Offer letter">
-            {app.offer_sent_at ? (
-              <div className="stack">
-                <div className="row">
-                  <span className="chip OFFERED">Sent {date(app.offer_sent_at)}</span>
-                  <button className="ghost small"
-                          onClick={() => api.download(`/applications/${id}/offer-letter`, `Offer — ${app.full_name}.pdf`)}>
-                    Download what was sent
-                  </button>
-                </div>
-                <p className="sub" style={{ margin: 0 }}>
-                  Emailed to {app.email}. The candidate's reply goes to the sender's inbox, not into this system.
-                </p>
+            <form onSubmit={saveOffer}>
+              <p style={{ marginTop: 0 }}>
+                Send the letter to the candidate however you normally would. Keep the signed copy here: it files
+                itself into OneDrive, and its terms build the employee record when they join.
+              </p>
+
+              <div className="field">
+                <label htmlFor="offer_letter">Signed offer letter — PDF, up to 8 MB</label>
+                <input id="offer_letter" type="file" accept="application/pdf"
+                       onChange={(e) => setOfferFile(e.target.files[0] || null)} />
+                {app.offer_letter_path && !offerFile && (
+                  <p className="sub" style={{ marginTop: 6 }}>
+                    A letter is on file.{' '}
+                    <button type="button" className="ghost small"
+                            onClick={() => api.download(`/applications/${id}/offer-letter`, `Offer — ${app.full_name}.pdf`)}>
+                      Download it
+                    </button>{' '}
+                    Choosing a new file replaces it.
+                  </p>
+                )}
               </div>
-            ) : (
-              <form onSubmit={(e) => submitOffer(e, true)}>
-                <p style={{ marginTop: 0 }}>
-                  Upload the signed offer letter and it is emailed to the candidate from your own mailbox, so their
-                  reply comes back to you.
-                </p>
 
+              <div className="field-row">
                 <div className="field">
-                  <label htmlFor="offer_letter">Offer letter — PDF, up to 8 MB</label>
-                  <input id="offer_letter" type="file" accept="application/pdf"
-                         onChange={(e) => setOfferFile(e.target.files[0] || null)} />
-                  {app.offer_letter_path && !offerFile && (
-                    <p className="sub" style={{ marginTop: 6 }}>
-                      A letter is already on file.{' '}
-                      <button type="button" className="ghost small"
-                              onClick={() => api.download(`/applications/${id}/offer-letter`, `Offer — ${app.full_name}.pdf`)}>
-                        Download it
-                      </button>{' '}
-                      Choosing a new file replaces it.
-                    </p>
-                  )}
+                  <label htmlFor="o_designation">Designation offered</label>
+                  <input id="o_designation" value={offer.offer_designation}
+                         placeholder={app.offer_designation || app.position_applied}
+                         onChange={(e) => setOffer({ ...offer, offer_designation: e.target.value })} />
                 </div>
+                <div className="field">
+                  <label htmlFor="o_ctc">Annual salary fixed (₹)</label>
+                  <input id="o_ctc" type="number" min="0" value={offer.offered_ctc}
+                         placeholder={app.offered_ctc || ''}
+                         onChange={(e) => setOffer({ ...offer, offered_ctc: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label htmlFor="o_doj">Date of joining</label>
+                  <input id="o_doj" type="date" value={offer.offer_joining_date}
+                         onChange={(e) => setOffer({ ...offer, offer_joining_date: e.target.value })} />
+                </div>
+              </div>
 
-                <div className="field-row">
-                  <div className="field">
-                    <label htmlFor="o_designation">Designation offered</label>
-                    <input id="o_designation" value={offer.offer_designation}
-                           placeholder={app.offer_designation || app.position_applied}
-                           onChange={(e) => setOffer({ ...offer, offer_designation: e.target.value })} />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="o_ctc">Annual salary fixed (₹)</label>
-                    <input id="o_ctc" type="number" min="0" value={offer.offered_ctc}
-                           placeholder={app.offered_ctc || ''}
-                           onChange={(e) => setOffer({ ...offer, offered_ctc: e.target.value })} />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="o_doj">Date of joining</label>
-                    <input id="o_doj" type="date" value={offer.offer_joining_date}
-                           onChange={(e) => setOffer({ ...offer, offer_joining_date: e.target.value })} />
-                  </div>
-                </div>
-                <p className="sub" style={{ marginTop: -6 }}>
-                  These are for the record and the employee card — the PDF you upload is what the candidate receives.
-                </p>
-
-                <div className="row">
-                  <button type="submit" className="signal" disabled={busy}>
-                    {busy ? 'Sending…' : `Email the offer to ${app.email}`}
-                  </button>
-                  <button type="button" className="ghost" disabled={busy} onClick={(e) => submitOffer(e, false)}>
-                    Save without sending
-                  </button>
-                </div>
-              </form>
-            )}
+              <button type="submit" disabled={busy}>
+                {busy ? 'Saving…' : 'Save offer letter'}
+              </button>
+            </form>
           </Section>
 
           <Section title="History">

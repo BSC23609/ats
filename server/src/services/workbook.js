@@ -136,7 +136,7 @@ export async function buildWorkbook() {
     { header: 'PIN code', key: 'pincode', width: 10 },
     { header: 'Applied on', key: 'applied', width: 13 },
     { header: 'Form submitted', key: 'form', width: 14 },
-    { header: 'Offer sent', key: 'offer_sent', width: 13 },
+    { header: 'Offer letter', key: 'offer_letter', width: 12 },
     { header: 'Resume summary', key: 'headline', width: 52 },
   ];
 
@@ -165,13 +165,13 @@ export async function buildWorkbook() {
       pincode: a.pincode,
       applied: a.created_at,
       form: a.stage2_submitted_at ? 'Yes' : 'No',
-      offer_sent: a.offer_sent_at,
+      offer_letter: a.offer_letter_path ? 'On file' : '',
       headline: a.ai_summary?.headline || '',
     });
   }
 
   ['expected', 'offered'].forEach((k) => (cand.getColumn(k).numFmt = '#,##0'));
-  ['applied', 'offer_sent'].forEach((k) => (cand.getColumn(k).numFmt = 'dd-mmm-yyyy'));
+  cand.getColumn('applied').numFmt = 'dd-mmm-yyyy';
   styleHeader(cand);
 
   return wb.xlsx.writeBuffer().then((b) => Buffer.from(b));

@@ -24,10 +24,9 @@ Node/Express + Postgres + React (Vite). No cloud dependency except the Anthropic
    reason for leaving, previous company HR contacts, expected salary, joining date, health, declaration.
 4. **Pipeline** — Applied → Shortlisted → Interview → Selected → Offered → Joined, plus Rejected / On hold /
    Withdrawn. Every move is written to the history with a note and the admin who made it.
-5. **Offer letter** — HR uploads the signed offer letter as a PDF (written and signed outside this system) and it is
-   emailed to the candidate **from that HR admin's own mailbox**, CC'd to themselves. The candidate's reply lands in
-   the HR admin's inbox, and the candidate moves to Offered automatically. HR can also save the letter against the
-   candidate without sending it.
+5. **Offer letter** — the letter is written, signed and sent outside this system, however HR prefers. The signed
+   copy is uploaded here for the record: it files itself into OneDrive and the candidate moves to Offered. Nothing
+   is emailed from the app.
 6. **Joined** — the employee record is created automatically from the full form. No re-typing.
 
 ## Who sees what
@@ -79,19 +78,6 @@ Password for all of them is `SEED_PASSWORD` from `.env` (default `Bharat@2026`).
 | hr.metfraa@bharatsteels.in | HR admin — Metfraa |
 | hr.crayon@bharatsteels.in | HR admin — Crayon Roofings |
 | hr.g2@bharatsteels.in | HR admin — G2 |
-
-### Offer letters and outgoing email
-
-The system does not write offer letters. HR uploads the finished, signed PDF against the candidate; that exact file
-is what gets attached to the email and what can be downloaded again later.
-
-Each HR admin sets up their own mailbox once, under **Settings → Outgoing email**. For Microsoft 365 that is
-`smtp.office365.com` on port 587 with an **app password** — not the account sign-in password. The password is
-encrypted at rest with a key derived from `JWT_SECRET`; rotating that secret means every admin must re-enter theirs.
-
-Letters go out From the admin's address, CC'd to themselves, with Reply-To set to them. Nothing is sent from a shared
-or system mailbox. An admin who has not set up their email can still upload and store the letter — only sending is
-blocked.
 
 ### The AI overview
 

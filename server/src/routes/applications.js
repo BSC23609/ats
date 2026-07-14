@@ -3,7 +3,6 @@ import { one, q, tx } from '../db.js';
 import { requireAuth, companyFilter, assertCompanyAccess } from '../auth.js';
 import multer from 'multer';
 import { summariseResume } from '../services/resume.js';
-import { sendOfferLetter } from '../services/offer.js';
 import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { syncWorkbook } from '../services/workbook.js';
@@ -201,7 +200,9 @@ r.post('/:id/status', async (req, res) => {
   if (status === 'JOINED') syncWorkbook();
 });
 
-/* Offer letters are written and signed outside this system, then uploaded here as a PDF. */
+/* Offer letters are written, signed and SENT outside this system — by email, by hand, however HR
+   prefers. What is stored here is the signed copy, for the record: it files itself into OneDrive
+   and its terms feed the employee record when the candidate joins. */
 const offerUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
@@ -211,14 +212,8 @@ const offerUpload = multer({
       : cb(new Error('The offer letter must be a PDF, under 8 MB.')),
 });
 
-/**
- * Upload the signed offer letter, and optionally email it to the candidate straight away.
- * The mail goes out from the HR admin's own mailbox, so the candidate's reply comes back to them.
- */
 r.post('/:id/offer-letter', offerUpload.single('offer_letter'), async (req, res, next) => {
   try {
-    const send = req.body.send === 'true' || req.body.send === true;
-
     const app = await one('SELECT * FROM applications WHERE id=$1', [req.params.id]);
     if (!app) return res.status(404).json({ error: 'Application not found.' });
     if (!assertCompanyAccess(req, res, app.company_id)) return;
@@ -249,32 +244,21 @@ r.post('/:id/offer-letter', offerUpload.single('offer_letter'), async (req, res,
       ]
     );
 
-    if (!send) return res.json({ ok: true, uploaded: Boolean(req.file), sent: false });
+    // Recording the letter is what moves the candidate to Offered — no email is sent from here.
+    if (req.file && app.status !== 'OFFERED') {
+      await tx(async (client) => {
+        await client.query(
+          `UPDATE applications SET status='OFFERED', updated_at=now() WHERE id=$1`, [app.id]
+        );
+        await client.query(
+          `INSERT INTO status_history (application_id, from_status, to_status, note, changed_by)
+           VALUES ($1,$2,'OFFERED','Signed offer letter recorded',$3)`,
+          [app.id, app.status, req.user.id]
+        );
+      });
+    }
 
-    const company = await one('SELECT * FROM companies WHERE id=$1', [app.company_id]);
-    const sender = await one(
-      `SELECT id, name, from_email, signature, smtp_host, smtp_port, smtp_user, smtp_pass_enc
-         FROM users WHERE id=$1`,
-      [req.user.id]
-    );
-
-    const fileBuffer = req.file ? req.file.buffer : await getFile(key);
-    await sendOfferLetter({ app: updated, company, sender, fileBuffer });
-
-    await tx(async (client) => {
-      await client.query(
-        `UPDATE applications SET status='OFFERED', offer_sent_at=now(), offer_sent_by=$1, updated_at=now()
-          WHERE id=$2`,
-        [req.user.id, app.id]
-      );
-      await client.query(
-        `INSERT INTO status_history (application_id, from_status, to_status, note, changed_by)
-         VALUES ($1,$2,'OFFERED',$3,$4)`,
-        [app.id, app.status, `Offer letter emailed to ${updated.email} from ${sender.from_email}`, req.user.id]
-      );
-    });
-
-    res.json({ ok: true, uploaded: Boolean(req.file), sent: true, from: sender.from_email });
+    res.json({ ok: true, uploaded: Boolean(req.file), offered_ctc: updated.offered_ctc });
   } catch (err) {
     next(err);
   }

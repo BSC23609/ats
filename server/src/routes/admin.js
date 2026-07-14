@@ -130,7 +130,7 @@ users.get('/companies', async (_req, res) => {
 /** One row per admin, with every company they look after folded in. */
 users.get('/', requireSuperAdmin, async (_req, res) => {
   const { rows } = await q(
-    `SELECT u.id, u.name, u.email, u.role, u.active, u.created_at, u.from_email,
+    `SELECT u.id, u.name, u.email, u.role, u.active, u.created_at,
             COALESCE(
               (SELECT json_agg(json_build_object('id', c.id, 'code', c.code, 'colour', c.colour) ORDER BY c.id)
                  FROM user_companies uc JOIN companies c ON c.id = uc.company_id

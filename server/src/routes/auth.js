@@ -1,16 +1,14 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { one, q } from '../db.js';
-import { signToken, requireAuth, encrypt } from '../auth.js';
+import { signToken, requireAuth } from '../auth.js';
 
 const r = Router();
 
 /** Name, role and the companies this person looks after. */
 async function profile(userId) {
   const user = await one(
-    `SELECT id, name, email, role, active, smtp_host, smtp_port, smtp_user, from_email, signature,
-            (smtp_pass_enc IS NOT NULL) AS smtp_password_set
-       FROM users WHERE id = $1`,
+    `SELECT id, name, email, role, active FROM users WHERE id = $1`,
     [userId]
   );
   if (!user) return null;
@@ -58,29 +56,6 @@ r.post('/change-password', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Current password is wrong.' });
 
   await q('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(new_password, 10), req.user.id]);
-  res.json({ ok: true });
-});
-
-/** Outgoing mail settings — offer letters go out from this mailbox, under this person's name. */
-r.put('/email-settings', requireAuth, async (req, res) => {
-  const { smtp_host, smtp_port, smtp_user, smtp_pass, from_email, signature } = req.body;
-  if (!smtp_host || !smtp_user || !from_email)
-    return res.status(400).json({ error: 'Mail server, username and From address are all required.' });
-
-  await q(
-    `UPDATE users SET smtp_host=$1, smtp_port=$2, smtp_user=$3, from_email=$4, signature=$5,
-            smtp_pass_enc = COALESCE($6, smtp_pass_enc)
-      WHERE id=$7`,
-    [
-      smtp_host,
-      Number(smtp_port) || 587,
-      smtp_user,
-      from_email,
-      signature || null,
-      smtp_pass ? encrypt(smtp_pass) : null, // blank means "keep the password already stored"
-      req.user.id,
-    ]
-  );
   res.json({ ok: true });
 });
 

@@ -1,5 +1,4 @@
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import { q } from './db.js';
 
 const SECRET = () => process.env.JWT_SECRET || 'dev-secret';
@@ -62,22 +61,3 @@ export const loadCompanyIds = async (userId) => {
   const { rows } = await q('SELECT company_id FROM user_companies WHERE user_id=$1 ORDER BY company_id', [userId]);
   return rows.map((r) => r.company_id);
 };
-
-/* ---------- SMTP password storage ----------
-   Each HR admin's mail password is encrypted at rest with a key derived from JWT_SECRET.
-   Rotating JWT_SECRET therefore invalidates stored mail passwords — they have to be re-entered. */
-const key = () => crypto.createHash('sha256').update(SECRET()).digest();
-
-export function encrypt(plain) {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key(), iv);
-  const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
-  return [iv.toString('hex'), cipher.getAuthTag().toString('hex'), enc.toString('hex')].join(':');
-}
-
-export function decrypt(payload) {
-  const [iv, tag, data] = payload.split(':');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key(), Buffer.from(iv, 'hex'));
-  decipher.setAuthTag(Buffer.from(tag, 'hex'));
-  return Buffer.concat([decipher.update(Buffer.from(data, 'hex')), decipher.final()]).toString('utf8');
-}
