@@ -268,3 +268,17 @@ jobs.get('/:id/jd', async (req, res) => {
   if (!job.jd_text) return res.status(404).json({ error: 'No job description has been uploaded for this role.' });
   res.json({ jd_filename: job.jd_filename, jd_text: job.jd_text });
 });
+
+/** Update a company's name, colour or address. The colour is the rail on every row for that company. */
+users.patch('/companies/:id', requireSuperAdmin, async (req, res) => {
+  const fields = ['name', 'colour', 'address', 'website', 'active'];
+  const set = fields.filter((k) => k in req.body);
+  if (!set.length) return res.status(400).json({ error: 'Nothing to update.' });
+
+  const { rows } = await q(
+    `UPDATE companies SET ${set.map((k, i) => `${k}=$${i + 1}`).join(', ')}
+      WHERE id=$${set.length + 1} RETURNING *`,
+    [...set.map((k) => req.body[k]), req.params.id]
+  );
+  res.json(rows[0]);
+});

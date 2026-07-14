@@ -9,6 +9,8 @@ import Employees from './pages/Employees.jsx';
 import Jobs from './pages/Jobs.jsx';
 import Users from './pages/Users.jsx';
 import Settings from './pages/Settings.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { GroupLogo } from './components/Logo.jsx';
 import './styles.css';
 
 function Shell({ children }) {
@@ -20,11 +22,7 @@ function Shell({ children }) {
     <div className="shell">
       <aside className="rail">
         <div className="rail-brand">
-          <div className="mark">
-            BHARAT STEEL
-            <br />
-            GROUP
-          </div>
+          <GroupLogo className="rail-logo" />
           <div className="sub">Recruitment</div>
         </div>
         <nav>
@@ -53,7 +51,11 @@ function Private({ children, superOnly }) {
   if (loading) return <div className="center">Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (superOnly && user.role !== 'SUPER_ADMIN') return <Navigate to="/pipeline" replace />;
-  return <Shell>{children}</Shell>;
+  return (
+    <Shell>
+      <ErrorBoundary>{children}</ErrorBoundary>
+    </Shell>
+  );
 }
 
 export default function App() {

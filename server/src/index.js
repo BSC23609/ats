@@ -7,7 +7,7 @@ import publicRoutes from './routes/public.js';
 import applicationRoutes from './routes/applications.js';
 import { employees, jobs, users } from './routes/admin.js';
 import { describeStorage } from './services/storage.js';
-import { isInitialised, initDb } from './init-db.js';
+import { isInitialised, initDb, syncCompanies } from './init-db.js';
 import { q } from './db.js';
 
 dotenv.config();
@@ -15,10 +15,28 @@ dotenv.config();
 const app = express();
 app.set('trust proxy', 1); // Render and Vercel both sit behind a proxy
 
-// In production the frontend lives on another origin (Vercel), so it must be named explicitly.
-// WEB_ORIGINS is a comma-separated list. Left unset, any origin is allowed — fine for local work.
-const origins = (process.env.WEB_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean);
-app.use(cors({ origin: origins.length ? origins : true }));
+// The frontend lives on another origin (Vercel), so it has to be named explicitly.
+// WEB_ORIGINS is a comma-separated list. Left unset, any origin is allowed.
+//
+// Browsers send the origin with no trailing slash, so a stray slash in the env var would
+// silently reject every request — the single most common way to lose an afternoon here.
+// Normalise both sides, and say out loud when something is turned away.
+const tidy = (o) => o.trim().replace(/\/+$/, '').toLowerCase();
+const origins = (process.env.WEB_ORIGINS || '').split(',').map(tidy).filter(Boolean);
+
+if (origins.length) console.log('CORS allows:', origins.join(', '));
+else console.log('CORS: WEB_ORIGINS is not set — allowing any origin.');
+
+app.use(
+  cors({
+    origin(origin, cb) {
+      if (!origin || !origins.length) return cb(null, true); // no list = allow all
+      if (origins.includes(tidy(origin))) return cb(null, true);
+      console.error(`✗ CORS blocked "${origin}". WEB_ORIGINS is "${origins.join(', ')}". They must match.`);
+      cb(null, false);
+    },
+  })
+);
 app.use(express.json({ limit: '2mb' }));
 
 app.get('/api/health', async (_req, res) => {
@@ -77,6 +95,7 @@ app.use((err, req, res, _next) => {
 async function bootstrap() {
   try {
     if (await isInitialised()) {
+      await syncCompanies(); // keep company names and brand colours in step with the code
       console.log('Database ready.');
       return;
     }

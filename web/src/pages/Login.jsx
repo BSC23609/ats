@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../api.jsx';
+import { GroupLogo } from '../components/Logo.jsx';
 
 export default function Login() {
   const { user, login, loading } = useAuth();
@@ -31,7 +32,7 @@ export default function Login() {
     <div className="center">
       <div className="login">
         <div className="public-head">
-          <div className="mark">BHARAT STEEL GROUP</div>
+          <GroupLogo className="login-logo" />
           <div className="sub">Recruitment · HR sign-in</div>
         </div>
 

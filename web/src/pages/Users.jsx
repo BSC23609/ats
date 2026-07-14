@@ -14,7 +14,7 @@ export default function Users() {
   const togglePick = (id, list, set) =>
     set(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
-  const load = () => api.get('/users').then(setRows);
+  const load = () => api.get('/users').then(setRows).catch((e) => setError(e.message));
   useEffect(() => {
     load();
     api.get('/users/companies').then(setCompanies);
@@ -157,7 +157,7 @@ export default function Users() {
           <tbody>
             {rows.map((u) => (
               <tr key={u.id} style={{ cursor: 'default' }}>
-                <td className="co" style={{ borderLeftColor: u.companies?.[0]?.colour || 'var(--ink)' }}>
+                <td className="co" style={{ borderLeftColor: (u.companies || [])[0]?.colour || 'var(--ink)' }}>
                   <div className="name">{u.name}</div>
                   {u.from_email && <div className="ref">sends offers from {u.from_email}</div>}
                 </td>
@@ -168,8 +168,8 @@ export default function Users() {
                     <span className="chip">All companies</span>
                   ) : (
                     <div className="taglist">
-                      {u.companies.length
-                        ? u.companies.map((c) => (
+                      {(u.companies || []).length
+                        ? (u.companies || []).map((c) => (
                             <span key={c.id} className="chip" style={{ borderLeftColor: c.colour, borderLeftWidth: 3 }}>
                               {c.code}
                             </span>
@@ -184,7 +184,7 @@ export default function Users() {
                   <div className="row">
                     {u.role === 'HR_ADMIN' && (
                       <button className="ghost small"
-                              onClick={() => setEditing({ ...u, company_ids: u.companies.map((c) => c.id) })}>
+                              onClick={() => setEditing({ ...u, company_ids: (u.companies || []).map((c) => c.id) })}>
                         Companies
                       </button>
                     )}

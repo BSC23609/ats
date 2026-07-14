@@ -8,12 +8,27 @@ import { pool, q, one } from './db.js';
 dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Colours read off each company's logo — they become the rail down the left of every row.
 const COMPANIES = [
-  ['BSC', 'Bharat Steel Chennai Pvt. Ltd.', '#2563A8', 'Chennai, Tamil Nadu', 'bharatsteels.in'],
-  ['METFRAA', 'Metfraa Steel Buildings Pvt. Ltd.', '#E2600B', 'Chennai, Tamil Nadu', 'metfraa.com'],
-  ['CRAYON', 'Crayon Roofings & Structures', '#0F8A78', 'Chennai, Tamil Nadu', 'crayonroofings.com'],
-  ['G2', 'G2 (Group Services)', '#6B4EA8', 'Chennai, Tamil Nadu', null],
+  ['BSC', 'Bharat Steel (Chennai) Pvt. Ltd.', '#0064A0', 'Chennai, Tamil Nadu', 'bharatsteels.in'],
+  ['METFRAA', 'Metfraa Steel Buildings Pvt. Ltd.', '#005A96', 'Chennai, Tamil Nadu', 'metfraa.com'],
+  ['CRAYON', 'Crayon Roofings & Structures', '#466E8C', 'Chennai, Tamil Nadu', 'crayonroofings.com'],
+  ['G2', 'G2 Steel Services Pvt. Ltd.', '#0A6EB4', 'Chennai, Tamil Nadu', null],
 ];
+
+/**
+ * Company names, colours and addresses are configuration, not data — so they are refreshed
+ * from the list above every time the API starts. Change a colour here, redeploy, done.
+ * Nothing else about the company row is touched.
+ */
+export async function syncCompanies() {
+  for (const [code, name, colour, address, website] of COMPANIES) {
+    await q(
+      `UPDATE companies SET name=$1, colour=$2, address=$3, website=$4 WHERE code=$5`,
+      [name, colour, address, website, code]
+    );
+  }
+}
 
 /** Has this database been set up already? */
 export async function isInitialised() {

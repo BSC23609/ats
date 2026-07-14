@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api.jsx';
+import { CompanyLogo } from '../components/Logo.jsx';
 
 /* Repeatable table blocks — children, siblings, emergency contacts, education, employment */
 function Rows({ label, cols, rows, setRows, blank, min = 1 }) {
@@ -102,7 +103,7 @@ export default function FullForm() {
     return (
       <div className="public">
         <div className="public-head">
-          <div className="mark">{app.company_name}</div>
+          <CompanyLogo code={app.company_code} name={app.company_name} className="public-logo" />
           <div className="sub">Application form · {app.ref_code}</div>
         </div>
         <div className="success" style={{ padding: 20 }}>
@@ -118,7 +119,7 @@ export default function FullForm() {
   return (
     <div className="public">
       <div className="public-head" style={{ borderBottomColor: app.colour }}>
-        <div className="mark">{app.company_name}</div>
+        <CompanyLogo code={app.company_code} name={app.company_name} className="public-logo" />
         <div className="sub">Application form · {app.ref_code} · {app.full_name}</div>
       </div>
 

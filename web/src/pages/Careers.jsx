@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.jsx';
+import { GroupLogo, CompanyLogo } from '../components/Logo.jsx';
 
 export default function Careers() {
   const [openings, setOpenings] = useState([]);
@@ -40,7 +41,7 @@ export default function Careers() {
     return (
       <div className="public">
         <div className="public-head">
-          <div className="mark">BHARAT STEEL GROUP</div>
+          <GroupLogo />
           <div className="sub">Careers</div>
         </div>
         <div className="success" style={{ padding: 20 }}>
@@ -66,7 +67,7 @@ export default function Careers() {
   return (
     <div className="public">
       <div className="public-head">
-        <div className="mark">BHARAT STEEL GROUP</div>
+        <GroupLogo />
         <div className="sub">Careers · Chennai</div>
       </div>
 
@@ -79,10 +80,9 @@ export default function Careers() {
       {!openings.length && <div className="empty">No roles are open right now. Check back soon.</div>}
 
       {Object.entries(byCompany).map(([company, list]) => (
-        <div key={company} style={{ marginBottom: 22 }}>
-          <div className="sub" style={{ fontFamily: 'var(--f-mono)', fontSize: 10, letterSpacing: '0.14em',
-                                        textTransform: 'uppercase', marginBottom: 8 }}>
-            {company}
+        <div key={company} style={{ marginBottom: 26 }}>
+          <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--line)' }}>
+            <CompanyLogo code={list[0].company_code} name={company} />
           </div>
           {list.map((o) => (
             <div key={o.id}
@@ -108,7 +108,7 @@ export default function Careers() {
         <form className="panel" onSubmit={submit} style={{ marginTop: 26 }}>
           <div className="panel-head">
             <h2>Apply — {job.title}</h2>
-            <span className="chip">{job.company_code}</span>
+            <CompanyLogo code={job.company_code} name={job.company_name} className="co-logo-sm" />
           </div>
           <div className="panel-body">
             {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}

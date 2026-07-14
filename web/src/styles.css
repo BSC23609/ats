@@ -1,13 +1,21 @@
 :root {
-  --ink: #0f1720;
-  --paper: #e5e9eb;
+  /* Group palette, taken from the logos: steel blue on near-black, on galvanised grey. */
+  --ink: #14181c;          /* the black of the lettering */
+  --paper: #e7eaec;        /* galvanised grey */
   --card: #ffffff;
   --line: #c3cbd1;
   --line-soft: #dde2e5;
   --muted: #5c6b77;
-  --signal: #e2600b;
+  --signal: #0064a0;       /* the blue in the group mark — the accent throughout */
+  --signal-dark: #004e7d;
   --ok: #0f8a78;
   --warn: #b4232a;
+
+  /* Per-company, used for the rail down the left of every row */
+  --co-bsc: #0064a0;
+  --co-metfraa: #005a96;
+  --co-crayon: #466e8c;
+  --co-g2: #0a6eb4;
   --hold: #8a6d1f;
 
   --f-display: 'Archivo', system-ui, sans-serif;
@@ -160,13 +168,13 @@ td.co { border-left: 3px solid var(--line); padding-left: 12px; }
 }
 .chip.solid { color: #fff; border-color: transparent; }
 .chip.APPLIED, .chip.SHORTLISTED { background: #eef2f4; color: #35424d; border-color: #d5dde1; }
-.chip.INTERVIEW { background: #fff2e4; color: #93430b; border-color: #f0c79f; }
+.chip.INTERVIEW { background: #eef5fb; color: #135a91; border-color: #b9d5ec; }
 .chip.SELECTED, .chip.OFFERED { background: #e6f4f1; color: #0b6152; border-color: #a9d8ce; }
 .chip.JOINED { background: var(--ok); color: #fff; border-color: transparent; }
 .chip.REJECTED, .chip.WITHDRAWN { background: #fbeaea; color: var(--warn); border-color: #eec4c4; }
 .chip.ON_HOLD { background: #fdf3dc; color: var(--hold); border-color: #e6d09a; }
 .chip.STRONG { background: var(--ok); color: #fff; border-color: transparent; }
-.chip.POSSIBLE { background: #fff2e4; color: #93430b; border-color: #f0c79f; }
+.chip.POSSIBLE { background: #fff4e5; color: #8a5a10; border-color: #eccb96; }
 .chip.WEAK { background: #fbeaea; color: var(--warn); border-color: #eec4c4; }
 
 /* ---------- forms ---------- */
@@ -197,11 +205,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 button.ghost { background: transparent; color: var(--ink); }
 button.ghost:hover:not(:disabled) { background: #eceff1; }
 button.signal { background: var(--signal); border-color: var(--signal); }
-button.signal:hover:not(:disabled) { background: #c95307; }
+button.signal:hover:not(:disabled) { background: var(--signal-dark); }
 button.danger { background: var(--warn); border-color: var(--warn); }
 button.small { padding: 5px 10px; font-size: 12px; }
 
-.note { background: #fff8f1; border: 1px solid #f0c79f; border-left: 3px solid var(--signal); padding: 10px 12px; border-radius: 3px; font-size: 13px; }
+.note { background: #eef5fb; border: 1px solid #b9d5ec; border-left: 3px solid var(--signal); padding: 10px 12px; border-radius: 3px; font-size: 13px; }
 .error { background: #fbeaea; border: 1px solid #eec4c4; border-left: 3px solid var(--warn); padding: 10px 12px; border-radius: 3px; color: var(--warn); font-size: 13px; }
 .success { background: #e6f4f1; border: 1px solid #a9d8ce; border-left: 3px solid var(--ok); padding: 10px 12px; border-radius: 3px; color: #0b6152; font-size: 13px; }
 .empty { padding: 44px 16px; text-align: center; color: var(--muted); }
@@ -274,6 +282,20 @@ button.small { padding: 5px 10px; font-size: 12px; }
 }
 .score small { font-size: 10px; font-weight: 400; opacity: 0.65; }
 .score.STRONG   { background: #e6f4f1; color: #0b6152; border-left-color: var(--ok); }
-.score.POSSIBLE { background: #fff2e4; color: #93430b; border-left-color: var(--signal); }
+.score.POSSIBLE { background: #fff4e5; color: #8a5a10; border-left-color: #d68f1e; }
 .score.WEAK     { background: #fbeaea; color: var(--warn); border-left-color: var(--warn); }
 .score.big { font-size: 30px; padding: 8px 14px; }
+
+
+/* ---------- brand marks ---------- */
+.rail-logo {
+  width: 100%; max-width: 150px; height: auto; display: block;
+  /* the group mark is dark lettering; on the dark rail it needs to be knocked out to white */
+  filter: brightness(0) invert(1);
+  margin-bottom: 4px;
+}
+.public-logo { height: 52px; width: auto; display: block; margin-bottom: 14px; }
+.login-logo  { height: 46px; width: auto; display: block; margin-bottom: 16px; }
+.co-logo     { height: 26px; width: auto; display: block; opacity: 0.9; }
+.co-logo-sm  { height: 20px; width: auto; display: inline-block; vertical-align: middle; }
+.opening-logo { height: 30px; width: auto; margin-right: 4px; }
