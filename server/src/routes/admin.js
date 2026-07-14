@@ -76,7 +76,7 @@ jobs.get('/', async (req, res) => {
   const company = companyFilter(req);
   const { rows } = await q(
     `SELECT j.id, j.company_id, j.title, j.department, j.location, j.employment_type,
-            j.min_experience, j.description, j.status, j.created_at,
+            j.min_experience, j.max_experience, j.description, j.status, j.created_at,
             j.jd_filename, (j.jd_text IS NOT NULL) AS has_jd,
             c.code AS company_code, c.colour,
             (SELECT count(*)::int FROM applications a WHERE a.job_id = j.id) AS applicant_count
@@ -94,11 +94,18 @@ jobs.post('/', async (req, res) => {
   if (!companyId || !b.title) return res.status(400).json({ error: 'Company and job title are required.' });
   if (!assertCompanyAccess(req, res, companyId)) return;
 
+  // An upper bound below the lower bound would silently filter out every candidate.
+  const min = Number(b.min_experience) || 0;
+  const max = b.max_experience === '' || b.max_experience == null ? null : Number(b.max_experience);
+  if (max != null && max < min)
+    return res.status(400).json({ error: 'Maximum experience cannot be less than the minimum.' });
+
   const { rows } = await q(
-    `INSERT INTO jobs (company_id, title, department, location, employment_type, min_experience, description, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    `INSERT INTO jobs (company_id, title, department, location, employment_type,
+                       min_experience, max_experience, description, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
     [companyId, b.title, b.department || null, b.location || null, b.employment_type || 'Full-time',
-     b.min_experience || 0, sanitise(b.description), req.user.id]
+     min, max, sanitise(b.description), req.user.id]
   );
   res.status(201).json(rows[0]);
 });
@@ -108,7 +115,8 @@ jobs.patch('/:id', async (req, res) => {
   if (!job) return res.status(404).json({ error: 'Job not found.' });
   if (!assertCompanyAccess(req, res, job.company_id)) return;
 
-  const f = ['title', 'department', 'location', 'employment_type', 'min_experience', 'description', 'status'];
+  const f = ['title', 'department', 'location', 'employment_type',
+             'min_experience', 'max_experience', 'description', 'status'];
   const set = f.filter((k) => k in req.body);
   if (!set.length) return res.status(400).json({ error: 'Nothing to update.' });
   const { rows } = await q(

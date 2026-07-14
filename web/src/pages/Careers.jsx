@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api.jsx';
+import { api, experienceRange } from '../api.jsx';
 import { GroupLogo, CompanyLogo } from '../components/Logo.jsx';
 
 export default function Careers() {
@@ -116,7 +116,7 @@ export default function Careers() {
               <div>
                 <div className="name">{o.title}</div>
                 <div className="sub">
-                  {[o.department, o.location, o.min_experience > 0 && `${o.min_experience}+ yrs`]
+                  {[o.department, o.location, experienceRange(o.min_experience, o.max_experience)]
                     .filter(Boolean).join(' · ')}
                 </div>
               </div>
@@ -135,7 +135,7 @@ export default function Careers() {
                 <CompanyLogo code={job.company_code} name={job.company_name} className="co-logo-sm" />
                 <h2 style={{ marginTop: 8 }}>{job.title}</h2>
                 <div className="sub">
-                  {[job.department, job.location, job.min_experience > 0 && `${job.min_experience}+ yrs`]
+                  {[job.department, job.location, experienceRange(job.min_experience, job.max_experience)]
                     .filter(Boolean).join(' · ')}
                 </div>
               </div>

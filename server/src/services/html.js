@@ -43,3 +43,14 @@ export function toText(html) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
+/** The experience a role asks for, in words. Mirrors what candidates see on the careers page. */
+export function describeRange(min, max) {
+  const lo = Number(min) || 0;
+  const hi = max == null ? null : Number(max);
+  if (!lo && hi == null) return null;
+  if (!lo && hi != null) return `up to ${hi} years`;
+  if (lo && hi == null) return `${lo} years or more`;
+  if (lo === hi) return `${lo} years`;
+  return `${lo} to ${hi} years`;
+}

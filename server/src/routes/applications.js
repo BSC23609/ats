@@ -5,7 +5,7 @@ import multer from 'multer';
 import { summariseResume } from '../services/resume.js';
 import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
-import { toText } from '../services/html.js';
+import { toText, describeRange } from '../services/html.js';
 import { syncWorkbook } from '../services/workbook.js';
 
 const r = Router();
@@ -109,7 +109,7 @@ r.post('/:id/reanalyse', async (req, res) => {
   if (!app.resume_text) return res.status(400).json({ error: 'No resume text to analyse.' });
 
   const job = app.job_id
-    ? await one('SELECT jd_text, description FROM jobs WHERE id=$1', [app.job_id])
+    ? await one('SELECT jd_text, description, min_experience, max_experience FROM jobs WHERE id=$1', [app.job_id])
     : null;
 
   await q(`UPDATE applications SET ai_status='PENDING' WHERE id=$1`, [app.id]);
@@ -120,6 +120,7 @@ r.post('/:id/reanalyse', async (req, res) => {
     company: app.company_name,
     experience: app.total_experience,
     jobDescription: job?.jd_text || toText(job?.description),
+    experienceRange: describeRange(job?.min_experience, job?.max_experience),
   });
 });
 

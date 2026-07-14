@@ -38,6 +38,17 @@ async function request(path, { method = 'GET', body, form } = {}) {
   return data;
 }
 
+/** How an experience range reads on screen. Handles every combination of the two bounds. */
+export function experienceRange(min, max) {
+  const lo = Number(min) || 0;
+  const hi = max == null || max === '' ? null : Number(max);
+  if (!lo && hi == null) return 'Any experience';
+  if (!lo && hi != null) return `Up to ${hi} yrs`;
+  if (lo && hi == null) return `${lo}+ yrs`;
+  if (lo === hi) return `${lo} yrs`;
+  return `${lo}–${hi} yrs`;
+}
+
 export const api = {
   get: (p) => request(p),
   post: (p, body) => request(p, { method: 'POST', body }),

@@ -5,7 +5,7 @@ import { one, q, tx } from '../db.js';
 import { extractText, summariseResume } from '../services/resume.js';
 import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
-import { toText } from '../services/html.js';
+import { toText, describeRange } from '../services/html.js';
 
 const r = Router();
 
@@ -29,7 +29,8 @@ const upload = multer({
 /** Companies + their open roles, for the careers page. */
 r.get('/openings', async (_req, res) => {
   const { rows } = await q(
-    `SELECT j.id, j.title, j.department, j.location, j.employment_type, j.min_experience, j.description,
+    `SELECT j.id, j.title, j.department, j.location, j.employment_type,
+            j.min_experience, j.max_experience, j.description,
             c.id AS company_id, c.code AS company_code, c.name AS company_name, c.colour
        FROM jobs j JOIN companies c ON c.id = j.company_id
       WHERE j.status = 'OPEN' AND c.active
@@ -115,7 +116,7 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
           await q('UPDATE applications SET resume_text=$1 WHERE id=$2', [text, app.id]);
 
           const job = app.job_id
-            ? await one('SELECT jd_text, description FROM jobs WHERE id=$1', [app.job_id])
+            ? await one('SELECT jd_text, description, min_experience, max_experience FROM jobs WHERE id=$1', [app.job_id])
             : null;
           await summariseResume(app.id, {
             resumeText: text,
@@ -124,6 +125,7 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
             experience: app.total_experience,
             // An uploaded JD document wins; otherwise score against what HR wrote on the opening.
             jobDescription: job?.jd_text || toText(job?.description),
+            experienceRange: describeRange(job?.min_experience, job?.max_experience),
           });
         } catch (err) {
           console.error('resume processing failed:', err.message);

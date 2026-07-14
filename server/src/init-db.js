@@ -26,6 +26,7 @@ export async function migrate() {
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS area    TEXT`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS city    TEXT`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS pincode TEXT`,
+    `ALTER TABLE jobs         ADD COLUMN IF NOT EXISTS max_experience INT`,
   ];
   for (const sql of steps) {
     try {

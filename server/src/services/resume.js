@@ -64,7 +64,10 @@ Reply with a single JSON object and nothing else — no prose, no markdown fence
  * Summarise a resume with Claude. Safe to call fire-and-forget: it writes the result
  * back to the application row and never throws into the request path.
  */
-export async function summariseResume(applicationId, { resumeText, position, company, experience, jobDescription }) {
+export async function summariseResume(
+  applicationId,
+  { resumeText, position, company, experience, jobDescription, experienceRange }
+) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key || !resumeText?.trim()) {
     await q(`UPDATE applications SET ai_status='SKIPPED' WHERE id=$1`, [applicationId]);
@@ -82,7 +85,9 @@ export async function summariseResume(applicationId, { resumeText, position, com
           content:
             `Company: ${company}\n` +
             `Position applied for: ${position}\n` +
-            `Experience the candidate declared: ${experience} years\n\n` +
+            `Experience the candidate declared: ${experience} years\n` +
+            (experienceRange ? `Experience the role asks for: ${experienceRange}\n` : '') +
+            '\n' +
             `JOB DESCRIPTION\n---------------\n` +
             (jobDescription?.trim()
               ? jobDescription.slice(0, 20000)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, useAuth, date } from '../api.jsx';
+import { api, useAuth, date, experienceRange } from '../api.jsx';
 import RichText from '../components/RichText.jsx';
 
 export default function Jobs() {
@@ -251,6 +251,11 @@ export default function Jobs() {
                 <label htmlFor="min_experience">Minimum experience (years)</label>
                 <input id="min_experience" name="min_experience" type="number" step="0.5" min="0" defaultValue="0" />
               </div>
+              <div className="field">
+                <label htmlFor="max_experience">Maximum experience (years)</label>
+                <input id="max_experience" name="max_experience" type="number" step="0.5" min="0"
+                       placeholder="No limit" />
+              </div>
             </div>
             <div className="field">
               <label htmlFor="description">What the role involves</label>
@@ -282,7 +287,7 @@ export default function Jobs() {
                     <div className="ref">{j.company_code}{j.department ? ` · ${j.department}` : ''}</div>
                   </td>
                   <td>{j.location || '—'}</td>
-                  <td>{j.min_experience > 0 ? `${j.min_experience} yrs` : '—'}</td>
+                  <td>{experienceRange(j.min_experience, j.max_experience)}</td>
                   <td>
                     {j.has_jd
                       ? <span className="chip JOINED">On file</span>
