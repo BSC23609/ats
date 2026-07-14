@@ -14,12 +14,14 @@ export function CompanyLogo({ code, name, className = 'co-logo' }) {
   );
 }
 
-export function GroupLogo({ className = 'public-logo' }) {
+export function GroupLogo({ className = 'public-logo', plate = false }) {
   const [failed, setFailed] = useState(false);
-  if (failed)
-    return <div className="mark">BHARAT STEEL GROUP</div>;
-  return (
+  if (failed) return <div className="mark">THE BHARAT STEEL GROUP</div>;
+
+  const img = (
     <img src="/brand/group.png" alt="The Bharat Steel Group" className={className}
          onError={() => setFailed(true)} />
   );
+  // On the dark rail the mark sits on a white plate, so its texture and blue survive.
+  return plate ? <span className="rail-logo-plate">{img}</span> : img;
 }

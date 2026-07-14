@@ -288,11 +288,15 @@ button.small { padding: 5px 10px; font-size: 12px; }
 
 
 /* ---------- brand marks ---------- */
+.rail-logo-plate {
+  background: #fff;
+  border-radius: 4px;
+  padding: 11px 13px;
+  display: block;
+  margin-bottom: 10px;
+}
 .rail-logo {
-  width: 100%; max-width: 150px; height: auto; display: block;
-  /* the group mark is dark lettering; on the dark rail it needs to be knocked out to white */
-  filter: brightness(0) invert(1);
-  margin-bottom: 4px;
+  width: 100%; height: auto; display: block;   /* the mark as designed — texture and blue intact */
 }
 .public-logo { height: 52px; width: auto; display: block; margin-bottom: 14px; }
 .login-logo  { height: 46px; width: auto; display: block; margin-bottom: 16px; }

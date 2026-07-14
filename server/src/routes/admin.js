@@ -166,10 +166,17 @@ users.patch('/:id', requireSuperAdmin, async (req, res) => {
   if (id === req.user.id && req.body.active === false)
     return res.status(400).json({ error: 'You cannot deactivate your own account.' });
 
+  // Demoting yourself out of SUPER_ADMIN would lock you out of this very page.
+  if (id === req.user.id && req.body.role && req.body.role !== 'SUPER_ADMIN')
+    return res.status(400).json({ error: 'You cannot remove your own super admin role.' });
+
   const sets = [];
   const vals = [];
-  for (const k of ['name', 'active', 'role']) {
-    if (k in req.body) { sets.push(`${k}=$${sets.length + 1}`); vals.push(req.body[k]); }
+  for (const k of ['name', 'email', 'active', 'role']) {
+    if (k in req.body) {
+      sets.push(`${k}=$${sets.length + 1}`);
+      vals.push(k === 'email' ? String(req.body[k]).toLowerCase().trim() : req.body[k]);
+    }
   }
   if (req.body.password) {
     if (req.body.password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
@@ -180,18 +187,32 @@ users.patch('/:id', requireSuperAdmin, async (req, res) => {
   const changingCompanies = Array.isArray(req.body.company_ids);
   if (!sets.length && !changingCompanies) return res.status(400).json({ error: 'Nothing to update.' });
 
-  await tx(async (client) => {
-    if (sets.length) {
-      vals.push(id);
-      await client.query(`UPDATE users SET ${sets.join(', ')} WHERE id=$${vals.length}`, vals);
-    }
-    if (changingCompanies) {
-      // Replace the whole set — the form always sends the complete list of companies.
-      await client.query('DELETE FROM user_companies WHERE user_id=$1', [id]);
-      for (const cid of req.body.company_ids.map(Number).filter(Boolean))
-        await client.query('INSERT INTO user_companies (user_id, company_id) VALUES ($1,$2)', [id, cid]);
-    }
-  });
+  // An HR admin with no company can sign in and see nothing — catch it here rather than
+  // letting someone create a ghost account.
+  const endRole = req.body.role || (await one('SELECT role FROM users WHERE id=$1', [id]))?.role;
+  if (endRole === 'HR_ADMIN' && changingCompanies && !req.body.company_ids.length)
+    return res.status(400).json({ error: 'An HR admin must look after at least one company.' });
+
+  try {
+    await tx(async (client) => {
+      if (sets.length) {
+        vals.push(id);
+        await client.query(`UPDATE users SET ${sets.join(', ')} WHERE id=$${vals.length}`, vals);
+      }
+      // A super admin reaches every company by role, so their membership rows are cleared.
+      if (endRole === 'SUPER_ADMIN') {
+        await client.query('DELETE FROM user_companies WHERE user_id=$1', [id]);
+      } else if (changingCompanies) {
+        // Replace the whole set — the form always sends the complete list.
+        await client.query('DELETE FROM user_companies WHERE user_id=$1', [id]);
+        for (const cid of req.body.company_ids.map(Number).filter(Boolean))
+          await client.query('INSERT INTO user_companies (user_id, company_id) VALUES ($1,$2)', [id, cid]);
+      }
+    });
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'Another account already uses that email.' });
+    throw e;
+  }
 
   res.json({ ok: true });
 });
