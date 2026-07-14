@@ -14,6 +14,27 @@ export default function Careers() {
     api.get('/public/openings').then(setOpenings).catch((e) => setError(e.message));
   }, []);
 
+  // Escape closes the form, the way any dialog should.
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && closeJob();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const openJob = (o) => {
+    setJob(o);
+    setError('');
+    setFile(null);
+    document.body.style.overflow = 'hidden'; // stop the page scrolling behind the dialog
+  };
+
+  const closeJob = () => {
+    setJob(null);
+    setError('');
+    setFile(null);
+    document.body.style.overflow = '';
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     if (!job) return setError('Choose the role you are applying for.');
@@ -29,6 +50,7 @@ export default function Careers() {
     try {
       const res = await api.upload('/public/apply', form);
       setDone(res.ref_code);
+      closeJob();
       window.scrollTo(0, 0);
     } catch (err) {
       setError(err.message);
@@ -52,7 +74,7 @@ export default function Careers() {
           </p>
         </div>
         <p style={{ marginTop: 20 }}>
-          <button className="ghost" onClick={() => { setDone(null); setJob(null); setFile(null); }}>
+          <button className="ghost" onClick={() => setDone(null)}>
             Apply for another role
           </button>
         </p>
@@ -86,11 +108,11 @@ export default function Careers() {
           </div>
           {list.map((o) => (
             <div key={o.id}
-                 className={`opening ${job?.id === o.id ? 'on' : ''}`}
+                 className="opening"
                  style={{ borderLeftColor: o.colour }}
-                 onClick={() => setJob(o)}
+                 onClick={() => openJob(o)}
                  role="button" tabIndex={0}
-                 onKeyDown={(e) => e.key === 'Enter' && setJob(o)}>
+                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openJob(o)}>
               <div>
                 <div className="name">{o.title}</div>
                 <div className="sub">
@@ -98,19 +120,28 @@ export default function Careers() {
                     .filter(Boolean).join(' · ')}
                 </div>
               </div>
-              <span className="chip">{job?.id === o.id ? 'Selected' : 'Apply'}</span>
+              <span className="chip">Apply</span>
             </div>
           ))}
         </div>
       ))}
 
       {job && (
-        <form className="panel" onSubmit={submit} style={{ marginTop: 26 }}>
-          <div className="panel-head">
-            <h2>Apply — {job.title}</h2>
-            <CompanyLogo code={job.company_code} name={job.company_name} className="co-logo-sm" />
-          </div>
-          <div className="panel-body">
+        <div className="overlay" onClick={(e) => e.target === e.currentTarget && closeJob()}>
+          <form className="dialog" onSubmit={submit} role="dialog" aria-modal="true"
+                aria-label={`Apply for ${job.title}`}>
+            <div className="dialog-head">
+              <div>
+                <CompanyLogo code={job.company_code} name={job.company_name} className="co-logo-sm" />
+                <h2 style={{ marginTop: 8 }}>{job.title}</h2>
+                <div className="sub">
+                  {[job.department, job.location, job.min_experience > 0 && `${job.min_experience}+ yrs`]
+                    .filter(Boolean).join(' · ')}
+                </div>
+              </div>
+              <button type="button" className="dialog-close" onClick={closeJob} aria-label="Close">×</button>
+            </div>
+            <div className="dialog-body">
             {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
 
             <div className="field-row">
@@ -163,14 +194,19 @@ export default function Careers() {
               </p>
             </div>
 
-            <div className="note" style={{ marginBottom: 16 }}>
+            <div className="note">
               This is the short form. If you are called for an interview, you will get a link to the full application
               form to complete on the day.
             </div>
 
-            <button type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send application'}</button>
-          </div>
-        </form>
+            </div>
+
+            <div className="dialog-foot">
+              <button type="button" className="ghost" onClick={closeJob}>Cancel</button>
+              <button type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send application'}</button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );

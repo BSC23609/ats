@@ -299,3 +299,52 @@ button.small { padding: 5px 10px; font-size: 12px; }
 .co-logo     { height: 26px; width: auto; display: block; opacity: 0.9; }
 .co-logo-sm  { height: 20px; width: auto; display: inline-block; vertical-align: middle; }
 .opening-logo { height: 30px; width: auto; margin-right: 4px; }
+
+/* ---------- dialog ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(20, 24, 28, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+.dialog {
+  background: var(--card);
+  border-radius: 5px;
+  box-shadow: 0 18px 50px rgba(20, 24, 28, 0.3);
+  width: 100%; max-width: 620px;
+  max-height: calc(100vh - 40px);
+  display: flex; flex-direction: column;   /* head and foot pinned, body scrolls */
+  margin: auto;
+}
+.dialog-head {
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-shrink: 0;
+}
+.dialog-body { padding: 20px 22px; overflow-y: auto; }
+.dialog-body .field:last-of-type { margin-bottom: 14px; }
+.dialog-foot {
+  padding: 14px 22px;
+  border-top: 1px solid var(--line-soft);
+  background: #f7f9fa;
+  border-radius: 0 0 5px 5px;
+  display: flex; justify-content: flex-end; gap: 8px;
+  flex-shrink: 0;
+}
+.dialog-close {
+  background: none; border: 1px solid transparent; color: var(--muted);
+  font-size: 24px; line-height: 1; padding: 2px 9px 5px; border-radius: 3px; cursor: pointer;
+  font-weight: 400; flex-shrink: 0;
+}
+.dialog-close:hover { background: var(--paper); color: var(--ink); border-color: var(--line); }
+
+/* the opening rows are now buttons that open the dialog, so give them a clearer affordance */
+.opening:hover .chip { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+@media (max-width: 640px) {
+  .overlay { padding: 0; }
+  .dialog { max-width: 100%; max-height: 100vh; border-radius: 0; }
+  .dialog-foot { border-radius: 0; }
+}
