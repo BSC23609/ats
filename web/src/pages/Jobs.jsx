@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api, useAuth, date } from '../api.jsx';
+import RichText from '../components/RichText.jsx';
 
 export default function Jobs() {
   const { user } = useAuth();
   const companies = user.companies || [];
   const [rows, setRows] = useState([]);
   const [adding, setAdding] = useState(false);
+  const [desc, setDesc] = useState('');        // the rich-text job description
+  const [editing, setEditing] = useState(null); // the opening whose description is being edited
   const [jd, setJd] = useState(null);          // the opening whose JD is being uploaded
   const [jdFile, setJdFile] = useState(null);
   const [jdText, setJdText] = useState('');
@@ -24,8 +27,22 @@ export default function Jobs() {
     setError('');
     const body = Object.fromEntries(new FormData(e.target));
     try {
-      await api.post('/jobs', body);
+      await api.post('/jobs', { ...body, description: desc });
       setAdding(false);
+      setDesc('');
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const saveDescription = async () => {
+    setError('');
+    try {
+      await api.patch(`/jobs/${editing.id}`, { description: desc });
+      setMsg(`Description updated for ${editing.title}.`);
+      setEditing(null);
+      setDesc('');
       load();
     } catch (err) {
       setError(err.message);
@@ -70,6 +87,29 @@ export default function Jobs() {
 
       {msg && <div className="success" style={{ marginBottom: 16 }}>{msg}</div>}
       {error && !adding && !jd && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
+
+      {editing && (
+        <div className="overlay" onClick={(e) => e.target === e.currentTarget && setEditing(null)}>
+          <div className="dialog" style={{ maxWidth: 760 }} role="dialog" aria-modal="true">
+            <div className="dialog-head">
+              <div>
+                <div className="eyebrow">Job description</div>
+                <h2>{editing.title}</h2>
+              </div>
+              <button type="button" className="dialog-close" onClick={() => setEditing(null)}>&times;</button>
+            </div>
+            <div className="dialog-body">
+              {error && <div className="error" style={{ marginBottom: 14 }}>{error}</div>}
+              <RichText value={desc} onChange={setDesc} minHeight={300}
+                        placeholder="Responsibilities, requirements, reporting line…" />
+            </div>
+            <div className="dialog-foot">
+              <button type="button" className="ghost" onClick={() => setEditing(null)}>Cancel</button>
+              <button type="button" onClick={saveDescription}>Save description</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {jd && (
         <form className="panel" onSubmit={saveJd} style={{ marginBottom: 16 }}>
@@ -145,7 +185,12 @@ export default function Jobs() {
             </div>
             <div className="field">
               <label htmlFor="description">What the role involves</label>
-              <textarea id="description" name="description" />
+              <RichText value={desc} onChange={setDesc}
+                        placeholder="Responsibilities, what a good week looks like, the software and codes they will use, who they report to…" />
+              <p className="sub" style={{ marginTop: 6 }}>
+                This is what candidates read on the careers page. If you do not upload a separate JD document,
+                resumes are scored against this.
+              </p>
             </div>
             <button type="submit">Post opening</button>
           </div>
@@ -178,6 +223,10 @@ export default function Jobs() {
                   <td><span className={`chip ${j.status === 'OPEN' ? 'JOINED' : j.status === 'CLOSED' ? 'REJECTED' : 'ON_HOLD'}`}>{j.status}</span></td>
                   <td>
                     <div className="row">
+                      <button className="ghost small"
+                              onClick={() => { setEditing(j); setDesc(j.description || ''); setMsg(''); setError(''); }}>
+                        Description
+                      </button>
                       <button className="ghost small" onClick={() => { setJd(j); setJdText(''); setJdFile(null); setMsg(''); }}>
                         {j.has_jd ? 'Replace JD' : 'Upload JD'}
                       </button>

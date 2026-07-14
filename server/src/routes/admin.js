@@ -8,6 +8,7 @@ import { extractText, summariseResume } from '../services/resume.js';
 import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { syncWorkbook } from '../services/workbook.js';
+import { sanitise } from '../services/html.js';
 
 
 export const employees = Router();
@@ -97,7 +98,7 @@ jobs.post('/', async (req, res) => {
     `INSERT INTO jobs (company_id, title, department, location, employment_type, min_experience, description, created_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
     [companyId, b.title, b.department || null, b.location || null, b.employment_type || 'Full-time',
-     b.min_experience || 0, b.description || null, req.user.id]
+     b.min_experience || 0, sanitise(b.description), req.user.id]
   );
   res.status(201).json(rows[0]);
 });
@@ -112,7 +113,7 @@ jobs.patch('/:id', async (req, res) => {
   if (!set.length) return res.status(400).json({ error: 'Nothing to update.' });
   const { rows } = await q(
     `UPDATE jobs SET ${set.map((k, i) => `${k}=$${i + 1}`).join(', ')} WHERE id=$${set.length + 1} RETURNING *`,
-    [...set.map((k) => req.body[k]), req.params.id]
+    [...set.map((k) => (k === 'description' ? sanitise(req.body[k]) : req.body[k])), req.params.id]
   );
   res.json(rows[0]);
 });

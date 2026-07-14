@@ -5,6 +5,7 @@ import { one, q, tx } from '../db.js';
 import { extractText, summariseResume } from '../services/resume.js';
 import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
+import { toText } from '../services/html.js';
 
 const r = Router();
 
@@ -113,13 +114,16 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
           const text = await extractText(req.file.buffer, req.file.mimetype, req.file.originalname);
           await q('UPDATE applications SET resume_text=$1 WHERE id=$2', [text, app.id]);
 
-          const job = app.job_id ? await one('SELECT jd_text FROM jobs WHERE id=$1', [app.job_id]) : null;
+          const job = app.job_id
+            ? await one('SELECT jd_text, description FROM jobs WHERE id=$1', [app.job_id])
+            : null;
           await summariseResume(app.id, {
             resumeText: text,
             position: app.position_applied,
             company: company.name,
             experience: app.total_experience,
-            jobDescription: job?.jd_text,
+            // An uploaded JD document wins; otherwise score against what HR wrote on the opening.
+            jobDescription: job?.jd_text || toText(job?.description),
           });
         } catch (err) {
           console.error('resume processing failed:', err.message);

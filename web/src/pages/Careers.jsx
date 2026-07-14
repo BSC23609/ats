@@ -142,6 +142,14 @@ export default function Careers() {
               <button type="button" className="dialog-close" onClick={closeJob} aria-label="Close">×</button>
             </div>
             <div className="dialog-body">
+              {job.description && (
+                <div style={{ marginBottom: 20, paddingBottom: 18, borderBottom: '1px solid var(--line-soft)' }}>
+                  <div className="eyebrow" style={{ marginBottom: 8 }}>About the role</div>
+                  {/* Written by an HR admin and stripped to a short tag allowlist on the server. */}
+                  <div className="jd" dangerouslySetInnerHTML={{ __html: job.description }} />
+                </div>
+              )}
+
             {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
 
             <div className="field-row">
