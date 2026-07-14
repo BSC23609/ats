@@ -4,6 +4,7 @@ import multer from 'multer';
 import { one, q, tx } from '../db.js';
 import { extractText, summariseResume } from '../services/resume.js';
 import { putFile } from '../services/storage.js';
+import { safeName } from '../services/graph.js';
 
 const r = Router();
 
@@ -36,14 +37,6 @@ r.get('/openings', async (_req, res) => {
   res.json(rows);
 });
 
-/** BSC-2607-0134 — company, year-month, running number. Taken from the id sequence so two
- *  candidates submitting at the same moment can never land on the same code. */
-async function nextRefCode(client, companyCode) {
-  const { rows } = await client.query(`SELECT nextval('applications_id_seq')::int AS n`);
-  const yymm = new Date().toISOString().slice(2, 7).replace('-', '');
-  return { id: rows[0].n, ref: `${companyCode}-${yymm}-${String(rows[0].n).padStart(4, '0')}` };
-}
-
 /** Stage 1 — candidate applies from the careers page. */
 r.post('/apply', upload.single('resume'), async (req, res) => {
   try {
@@ -54,15 +47,21 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
     const company = await one('SELECT * FROM companies WHERE id=$1 AND active', [b.company_id]);
     if (!company) return res.status(400).json({ error: 'That company is not accepting applications.' });
 
-    // Store the resume before the row exists, so a failed upload never leaves a half-made application.
+    // Reserve the id first so the resume can be filed under its reference code, then store the
+    // file before the row exists — a failed upload should never leave a half-made application.
+    const seq = await one(`SELECT nextval('applications_id_seq')::int AS n`);
+    const yymm = new Date().toISOString().slice(2, 7).replace('-', '');
+    const ref = `${company.code}-${yymm}-${String(seq.n).padStart(4, '0')}`;
+
     let resumeKey = null;
     if (req.file) {
-      resumeKey = `resumes/${Date.now()}-${Math.round(Math.random() * 1e6)}${path.extname(req.file.originalname)}`;
+      const ext = path.extname(req.file.originalname) || '.pdf';
+      resumeKey = `Resumes/${company.code}/${safeName(`${ref} - ${b.full_name}`)}${ext}`;
       await putFile(resumeKey, req.file.buffer, req.file.mimetype);
     }
 
     const app = await tx(async (client) => {
-      const { id, ref } = await nextRefCode(client, company.code);
+      const id = seq.n;
       const { rows } = await client.query(
         `INSERT INTO applications
            (id, ref_code, company_id, job_id, full_name, email, phone, position_applied, current_location,

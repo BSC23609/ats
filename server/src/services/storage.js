@@ -1,15 +1,18 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import * as graph from './graph.js';
 
 /**
- * Files (resumes, offer letters) live in one of two places:
+ * Files (resumes, job descriptions, offer letters) live in one of three places:
  *
- *   local — a directory on disk. Fine on your own server or a Render disk.
- *   s3    — any S3-compatible bucket: Cloudflare R2, AWS S3, Backblaze, MinIO.
+ *   local     — a directory on disk. Fine on your own server.
+ *   s3        — any S3-compatible bucket: Cloudflare R2, AWS S3, Backblaze, MinIO.
+ *   onedrive  — the group's OneDrive, through Microsoft Graph. HR can open the folder
+ *               in Explorer or in the browser and see every resume filed by company.
  *
- * Object storage is what you want on a platform with an ephemeral filesystem,
- * because a redeploy there wipes the disk and every resume with it.
+ * Object storage of some kind is essential on a platform with an ephemeral filesystem
+ * (Render, Vercel), because a redeploy wipes the disk and every resume with it.
  *
  * Both drivers return and accept the same thing: an opaque key stored in the
  * database. Nothing above this file knows or cares which driver is in use.
@@ -30,6 +33,7 @@ const s3 = () =>
 
 /** @returns {Promise<string>} the key to store on the application row */
 export async function putFile(key, buffer, contentType) {
+  if (DRIVER === 'onedrive') return graph.upload(key, buffer, contentType).then(() => key);
   if (DRIVER === 's3') {
     await s3().send(
       new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buffer, ContentType: contentType })
@@ -44,6 +48,7 @@ export async function putFile(key, buffer, contentType) {
 
 /** @returns {Promise<Buffer>} */
 export async function getFile(key) {
+  if (DRIVER === 'onedrive') return graph.download(key);
   if (DRIVER === 's3') {
     const res = await s3().send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
     return Buffer.from(await res.Body.transformToByteArray());
@@ -53,6 +58,7 @@ export async function getFile(key) {
 
 export async function deleteFile(key) {
   try {
+    if (DRIVER === 'onedrive') return graph.remove(key);
     if (DRIVER === 's3') {
       await s3().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
       return;
@@ -64,4 +70,8 @@ export async function deleteFile(key) {
 }
 
 export const describeStorage = () =>
-  DRIVER === 's3' ? `s3 (${BUCKET})` : `local disk (${path.resolve(LOCAL_DIR)})`;
+  DRIVER === 'onedrive'
+    ? `onedrive (${process.env.GRAPH_DRIVE_USER}/${process.env.GRAPH_ROOT_FOLDER || 'ATS'})`
+    : DRIVER === 's3'
+      ? `s3 (${BUCKET})`
+      : `local disk (${path.resolve(LOCAL_DIR)})`;

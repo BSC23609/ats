@@ -13,6 +13,8 @@ export default function Employees() {
   const [open, setOpen] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -26,6 +28,20 @@ export default function Employees() {
       .finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, [company, status, search]);
+
+  const syncWorkbook = async () => {
+    setSyncing(true);
+    setError('');
+    setMsg('');
+    try {
+      await api.post('/employees/sync-workbook');
+      setMsg('Master workbook rebuilt and uploaded to OneDrive.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const exit = async (emp) => {
     const exit_date = prompt('Last working day (YYYY-MM-DD)');
@@ -42,7 +58,10 @@ export default function Employees() {
         <div>
           <div className="eyebrow">People</div>
           <h1>Employees</h1>
-          <div className="sub">Built automatically when a candidate is marked joined.</div>
+          <div className="sub">
+            Built automatically when a candidate is marked joined. The master workbook on OneDrive
+            updates itself with every change.
+          </div>
         </div>
         <div className="row">
           {multi && (
@@ -59,9 +78,13 @@ export default function Employees() {
           </select>
           <input placeholder="Search name, code, role…" value={search}
                  onChange={(e) => setSearch(e.target.value)} style={{ width: 220 }} />
+          <button className="ghost" onClick={syncWorkbook} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Sync to OneDrive'}
+          </button>
         </div>
       </div>
 
+      {msg && <div className="success" style={{ marginBottom: 16 }}>{msg}</div>}
       {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
 
       <div className="panel">

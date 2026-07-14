@@ -6,6 +6,8 @@ import { one, q, tx } from '../db.js';
 import { requireAuth, requireSuperAdmin, companyFilter, assertCompanyAccess } from '../auth.js';
 import { extractText, summariseResume } from '../services/resume.js';
 import { putFile } from '../services/storage.js';
+import { safeName } from '../services/graph.js';
+import { syncWorkbook } from '../services/workbook.js';
 
 
 export const employees = Router();
@@ -53,6 +55,17 @@ employees.patch('/:id', async (req, res) => {
     [...set.map((k) => req.body[k] || null), req.params.id]
   );
   res.json(rows[0]);
+  syncWorkbook(); // an edit or an exit changes the master sheet
+});
+
+/** Rebuild the workbook on demand — the "Sync to OneDrive" button. */
+employees.post('/sync-workbook', async (req, res, next) => {
+  try {
+    const url = await syncWorkbook({ throwOnError: true });
+    res.json({ ok: true, url });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export const jobs = Router();
@@ -245,7 +258,9 @@ jobs.post('/:id/jd', jdUpload.single('jd'), async (req, res, next) => {
     let filename = job.jd_filename;
 
     if (req.file) {
-      key = `jds/job-${job.id}-${Date.now()}${path.extname(req.file.originalname)}`;
+      const company = await one('SELECT code FROM companies WHERE id=$1', [job.company_id]);
+      const ext = path.extname(req.file.originalname) || '.pdf';
+      key = `Job Descriptions/${company.code}/${safeName(job.title)}${ext}`;
       await putFile(key, req.file.buffer, req.file.mimetype);
       filename = req.file.originalname;
       text = await extractText(req.file.buffer, req.file.mimetype, req.file.originalname);

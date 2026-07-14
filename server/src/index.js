@@ -7,6 +7,7 @@ import publicRoutes from './routes/public.js';
 import applicationRoutes from './routes/applications.js';
 import { employees, jobs, users } from './routes/admin.js';
 import { describeStorage } from './services/storage.js';
+import { checkGraph } from './services/graph.js';
 import { isInitialised, initDb, syncCompanies } from './init-db.js';
 import { q } from './db.js';
 
@@ -44,6 +45,7 @@ app.get('/api/health', async (_req, res) => {
     ok: true,
     ai: Boolean(process.env.ANTHROPIC_API_KEY),
     storage: describeStorage(),
+    onedrive: await checkGraph(),
     database: 'unknown',
     users: null,
   };

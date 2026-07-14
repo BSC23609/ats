@@ -5,6 +5,8 @@ import multer from 'multer';
 import { summariseResume } from '../services/resume.js';
 import { sendOfferLetter } from '../services/offer.js';
 import { putFile, getFile } from '../services/storage.js';
+import { safeName } from '../services/graph.js';
+import { syncWorkbook } from '../services/workbook.js';
 
 const r = Router();
 r.use(requireAuth);
@@ -193,6 +195,10 @@ r.post('/:id/status', async (req, res) => {
   });
 
   res.json({ ok: true, employee: result });
+
+  // A new employee record means the master workbook is out of date. Fire-and-forget:
+  // OneDrive being slow must not make the HR admin's click fail.
+  if (status === 'JOINED') syncWorkbook();
 });
 
 /* Offer letters are written and signed outside this system, then uploaded here as a PDF. */
@@ -221,7 +227,8 @@ r.post('/:id/offer-letter', offerUpload.single('offer_letter'), async (req, res,
 
     let key = app.offer_letter_path;
     if (req.file) {
-      key = `offers/offer-${app.id}-${Date.now()}.pdf`;
+      const co = await one('SELECT code FROM companies WHERE id=$1', [app.company_id]);
+      key = `Offer Letters/${co.code}/${safeName(`${app.ref_code} - ${app.full_name}`)}.pdf`;
       await putFile(key, req.file.buffer, 'application/pdf');
     }
 
