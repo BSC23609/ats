@@ -86,7 +86,10 @@ CREATE TABLE applications (
   email              TEXT NOT NULL,
   phone              TEXT NOT NULL,
   position_applied   TEXT NOT NULL,
-  current_location   TEXT,
+  current_location   TEXT,          -- the three below, joined up, for display and search
+  area               TEXT,
+  city               TEXT,
+  pincode            TEXT,
   total_experience   NUMERIC(4,1) DEFAULT 0,
   current_ctc        NUMERIC(12,2),
   expected_ctc       NUMERIC(12,2),

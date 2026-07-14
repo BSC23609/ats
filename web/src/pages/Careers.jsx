@@ -161,9 +161,23 @@ export default function Careers() {
 
             <div className="field-row">
               <div className="field">
-                <label htmlFor="current_location">Current location</label>
-                <input id="current_location" name="current_location" placeholder="Chennai" />
+                <label htmlFor="area">Area <span className="req">*</span></label>
+                <input id="area" name="area" required placeholder="Ambattur" />
               </div>
+              <div className="field">
+                <label htmlFor="city">City / Town <span className="req">*</span></label>
+                <input id="city" name="city" required placeholder="Chennai" />
+              </div>
+              <div className="field">
+                <label htmlFor="pincode">PIN code <span className="req">*</span></label>
+                <input id="pincode" name="pincode" required
+                       inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
+                       title="Six digits"
+                       placeholder="600053" />
+              </div>
+            </div>
+
+            <div className="field-row">
               <div className="field">
                 <label htmlFor="total_experience">Total experience (years)</label>
                 <input id="total_experience" name="total_experience" type="number" step="0.5" min="0" defaultValue="0" />

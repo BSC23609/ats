@@ -8,7 +8,7 @@ import applicationRoutes from './routes/applications.js';
 import { employees, jobs, users } from './routes/admin.js';
 import { describeStorage } from './services/storage.js';
 import { checkGraph } from './services/graph.js';
-import { isInitialised, initDb, syncCompanies } from './init-db.js';
+import { isInitialised, initDb, syncCompanies, migrate } from './init-db.js';
 import { q } from './db.js';
 
 dotenv.config();
@@ -97,6 +97,7 @@ app.use((err, req, res, _next) => {
 async function bootstrap() {
   try {
     if (await isInitialised()) {
+      await migrate();       // additive schema changes, safe to run every time
       await syncCompanies(); // keep company names and brand colours in step with the code
       console.log('Database ready.');
       return;

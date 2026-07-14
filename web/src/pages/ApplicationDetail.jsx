@@ -305,7 +305,15 @@ export default function ApplicationDetail() {
             <dl className="kv">
               <dt>Email</dt><dd>{app.email}</dd>
               <dt>Mobile</dt><dd>{app.phone}</dd>
-              <dt>Location</dt><dd>{app.current_location || '—'}</dd>
+              <dt>Location</dt>
+              <dd>
+                {app.area || app.city || app.pincode ? (
+                  <>
+                    {[app.area, app.city].filter(Boolean).join(', ')}
+                    {app.pincode && <div className="ref">PIN {app.pincode}</div>}
+                  </>
+                ) : (app.current_location || '—')}
+              </dd>
               <dt>Experience</dt><dd>{app.total_experience} years</dd>
               <dt>Current salary</dt><dd>{money(app.current_ctc)}</dd>
               <dt>Expected salary</dt><dd>{money(app.expected_ctc)}</dd>

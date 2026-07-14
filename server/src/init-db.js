@@ -17,6 +17,26 @@ const COMPANIES = [
 ];
 
 /**
+ * Small, additive schema changes for databases that already hold candidates.
+ * Every statement must be safe to run twice — this fires on every boot.
+ * Nothing here ever drops or rewrites a column.
+ */
+export async function migrate() {
+  const steps = [
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS area    TEXT`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS city    TEXT`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS pincode TEXT`,
+  ];
+  for (const sql of steps) {
+    try {
+      await q(sql);
+    } catch (err) {
+      console.error('Migration step failed:', sql, '—', err.message);
+    }
+  }
+}
+
+/**
  * Company names, colours and addresses are configuration, not data — so they are refreshed
  * from the list above every time the API starts. Change a colour here, redeploy, done.
  * Nothing else about the company row is touched.

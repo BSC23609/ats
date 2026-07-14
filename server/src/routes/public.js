@@ -44,6 +44,9 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
     if (!b.full_name || !b.email || !b.phone || !b.company_id || !b.position_applied)
       return res.status(400).json({ error: 'Name, email, phone, company and position are required.' });
 
+    if (b.pincode && !/^\d{6}$/.test(String(b.pincode).trim()))
+      return res.status(400).json({ error: 'An Indian PIN code is six digits.' });
+
     const company = await one('SELECT * FROM companies WHERE id=$1 AND active', [b.company_id]);
     if (!company) return res.status(400).json({ error: 'That company is not accepting applications.' });
 
@@ -64,10 +67,11 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
       const id = seq.n;
       const { rows } = await client.query(
         `INSERT INTO applications
-           (id, ref_code, company_id, job_id, full_name, email, phone, position_applied, current_location,
+           (id, ref_code, company_id, job_id, full_name, email, phone, position_applied,
+            current_location, area, city, pincode,
             total_experience, current_ctc, expected_ctc, notice_period_days, source,
             resume_path, resume_filename, ai_status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'PENDING')
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'PENDING')
          RETURNING *`,
         [
           id,
@@ -78,7 +82,11 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
           b.email.trim().toLowerCase(),
           b.phone.trim(),
           b.position_applied.trim(),
-          b.current_location || null,
+          // Kept as one line too, so search and the pipeline table stay simple.
+          [b.area, b.city, b.pincode].map((x) => (x || '').trim()).filter(Boolean).join(', ') || null,
+          (b.area || '').trim() || null,
+          (b.city || '').trim() || null,
+          (b.pincode || '').trim() || null,
           b.total_experience || 0,
           b.current_ctc || null,
           b.expected_ctc || null,
