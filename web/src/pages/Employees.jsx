@@ -12,6 +12,7 @@ export default function Employees() {
   const [rows, setRows] = useState([]);
   const [open, setOpen] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -19,9 +20,12 @@ export default function Employees() {
     if (company) qs.set('company', company);
     if (status) qs.set('status', status);
     if (search) qs.set('q', search);
-    api.get(`/employees?${qs}`).then(setRows).finally(() => setLoading(false));
+    api.get(`/employees?${qs}`)
+      .then(setRows)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
   };
-  useEffect(load, [company, status, search]);
+  useEffect(() => { load(); }, [company, status, search]);
 
   const exit = async (emp) => {
     const exit_date = prompt('Last working day (YYYY-MM-DD)');
@@ -57,6 +61,8 @@ export default function Employees() {
                  onChange={(e) => setSearch(e.target.value)} style={{ width: 220 }} />
         </div>
       </div>
+
+      {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
 
       <div className="panel">
         {loading ? <div className="empty">Loading…</div>

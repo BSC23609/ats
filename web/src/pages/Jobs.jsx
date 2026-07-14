@@ -13,8 +13,11 @@ export default function Jobs() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
 
-  const load = () => api.get('/jobs').then(setRows);
-  useEffect(load, []);
+  const load = () => api.get('/jobs').then(setRows).catch((e) => setError(e.message));
+
+  // Braces matter: passing `load` directly would hand React the promise it returns, and React
+  // would try to call that promise as a cleanup function when you navigate away — "n is not a function".
+  useEffect(() => { load(); }, []);
 
   const create = async (e) => {
     e.preventDefault();
