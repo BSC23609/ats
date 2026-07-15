@@ -93,6 +93,7 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
           b.current_ctc || null,
           b.expected_ctc || null,
           b.notice_period_days || null,
+          'careers',                 // source ($17) — this was the missing value
           resumeKey,
           req.file?.originalname || null,
         ]
