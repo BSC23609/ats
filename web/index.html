@@ -11,14 +11,53 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <meta name="theme-color" content="#14181c" />
+    <meta name="theme-color" content="#0d1422" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ATS" />
     <meta name="description" content="Careers and recruitment at the Bharat Steel Group — Bharat Steel Chennai, Metfraa Steel Buildings, Crayon Roofings and G2 Steel Services." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <div id="boot" aria-hidden="true">
+      <div class="boot-mark">
+        <img src="/brand/ATS-wordmark-white.png" alt="ATS" />
+        <div class="boot-sub">Applicant Tracking System</div>
+        <div class="boot-by">
+          <span>built by</span>
+          <img src="/brand/group.png" alt="The Bharat Steel Group" />
+        </div>
+      </div>
+      <div class="boot-spin"></div>
+    </div>
+    <style>
+      #boot{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;
+            align-items:center;justify-content:center;gap:26px;
+            background:#0d1422;background:linear-gradient(150deg,#0d1422 0%,#0d3a6b 100%);
+            transition:opacity .4s ease}
+      #boot.hide{opacity:0;pointer-events:none}
+      .boot-mark{display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;padding:0 24px}
+      .boot-mark>img{width:210px;max-width:64vw;height:auto}
+      .boot-sub{font-family:'Archivo',system-ui,sans-serif;font-weight:600;font-size:13px;
+                letter-spacing:.03em;color:#cdd8e6}
+      .boot-by{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:14px}
+      .boot-by span{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.22em;
+                    text-transform:uppercase;color:#7d93ad}
+      .boot-by img{width:150px;max-width:52vw;height:auto;
+                   background:#fff;border-radius:4px;padding:9px 12px}
+      .boot-spin{width:26px;height:26px;border:3px solid rgba(255,255,255,.18);
+                 border-top-color:#2a7fd4;border-radius:50%;animation:bs .8s linear infinite}
+      @keyframes bs{to{transform:rotate(360deg)}}
+      @media(prefers-reduced-motion:reduce){.boot-spin{animation:none}}
+    </style>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+      }
+    </script>
   </body>
 </html>
