@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import ResumeViewer from '../components/ResumeViewer.jsx';
 import { api, PIPELINE, CLOSED, STATUS_LABEL, money, date, dateTime, scoreBand } from '../api.jsx';
 
 const Section = ({ title, children }) => (
@@ -200,6 +201,7 @@ export default function ApplicationDetail() {
   const navigate = useNavigate();
   const [app, setApp] = useState(null);
   const [error, setError] = useState('');
+  const [showResume, setShowResume] = useState(false);
   const [msg, setMsg] = useState('');
   const [move, setMove] = useState({ status: '', note: '', interview_at: '', offered_ctc: '', date_of_joining: '', designation: '', department: '' });
   const [offer, setOffer] = useState({ offer_designation: '', offered_ctc: '', offer_joining_date: '' });
@@ -266,6 +268,10 @@ export default function ApplicationDetail() {
 
   return (
     <>
+      {showResume && app.resume_filename && (
+        <ResumeViewer applicationId={app.id} filename={app.resume_filename}
+                      onClose={() => setShowResume(false)} />
+      )}
       <div className="page-head">
         <div>
           <div className="eyebrow">{app.ref_code} · {app.company_name}</div>
@@ -320,12 +326,14 @@ export default function ApplicationDetail() {
               {app.offered_ctc && <><dt>Offered</dt><dd>{money(app.offered_ctc)}</dd></>}
             </dl>
             {app.resume_filename && (
-              <p style={{ marginBottom: 0, marginTop: 14 }}>
+              <div className="row" style={{ marginTop: 14 }}>
+                <button onClick={() => setShowResume(true)}>View resume</button>
                 <button className="ghost small"
-                        onClick={() => api.download(`/applications/${app.id}/resume`, app.resume_filename)}>
-                  Download resume — {app.resume_filename}
+                        onClick={() => api.download(`/applications/${app.id}/resume?download=1`, app.resume_filename)}>
+                  Download
                 </button>
-              </p>
+                <span className="ref" style={{ alignSelf: 'center' }}>{app.resume_filename}</span>
+              </div>
             )}
           </Section>
 

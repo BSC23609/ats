@@ -91,7 +91,19 @@ r.get('/:id/resume', async (req, res, next) => {
     if (!assertCompanyAccess(req, res, app.company_id)) return;
 
     const buffer = await getFile(app.resume_path);
-    res.attachment(app.resume_filename);
+
+    // The extension decides how the browser treats it. PDFs and images render inline; a .doc/.docx
+    // has no in-browser viewer, so it still downloads.
+    const ext = (app.resume_filename || '').toLowerCase().split('.').pop();
+    const type = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' }[ext];
+
+    // ?download=1 forces the save dialog; without it, viewable types open in the tab / our modal.
+    const inline = type && req.query.download !== '1';
+    res.setHeader('Content-Type', type || 'application/octet-stream');
+    res.setHeader(
+      'Content-Disposition',
+      `${inline ? 'inline' : 'attachment'}; filename="${(app.resume_filename || 'resume').replace(/"/g, '')}"`
+    );
     res.send(buffer);
   } catch {
     res.status(404).json({ error: 'That resume could not be retrieved from storage.' });

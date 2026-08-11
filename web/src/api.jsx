@@ -68,6 +68,15 @@ export const api = {
     a.click();
     URL.revokeObjectURL(url);
   },
+
+  // Fetch an authenticated file and hand back an object URL plus its type, for viewing in-app.
+  // The caller must revoke the URL when done, or the blob leaks for the life of the tab.
+  blobUrl: async (p) => {
+    const res = await fetch(`${BASE}${p}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error('That file could not be opened.');
+    const blob = await res.blob();
+    return { url: URL.createObjectURL(blob), type: blob.type };
+  },
 };
 
 /* ---------- auth context ---------- */

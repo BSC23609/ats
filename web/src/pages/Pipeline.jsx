@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, useAuth, PIPELINE, CLOSED, STATUS_LABEL, money, date, scoreBand } from '../api.jsx';
+import ResumeViewer from '../components/ResumeViewer.jsx';
 
 export default function Pipeline() {
   const { user } = useAuth();
@@ -16,6 +17,7 @@ export default function Pipeline() {
   const [rows, setRows] = useState([]);
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [resumeFor, setResumeFor] = useState(null);   // {id, name} of the resume open in the viewer
 
   const scope = company ? `company=${company}` : '';
 
@@ -43,6 +45,10 @@ export default function Pipeline() {
 
   return (
     <>
+      {resumeFor && (
+        <ResumeViewer applicationId={resumeFor.id} filename={resumeFor.name}
+                      onClose={() => setResumeFor(null)} />
+      )}
       <div className="page-head">
         <div>
           <div className="eyebrow">Recruitment</div>
@@ -141,6 +147,12 @@ export default function Pipeline() {
                       <span className="sub">Could not read the resume</span>
                     ) : (
                       <span className="sub">No resume attached</span>
+                    )}
+                    {a.resume_filename && (
+                      <button className="ghost small" style={{ marginTop: 6 }}
+                              onClick={(e) => { e.stopPropagation(); setResumeFor({ id: a.id, name: a.resume_filename }); }}>
+                        View resume
+                      </button>
                     )}
                   </td>
                   <td>{a.total_experience} yrs{a.notice_period_days != null && <div className="sub">{a.notice_period_days}d notice</div>}</td>
