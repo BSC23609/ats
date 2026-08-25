@@ -35,7 +35,10 @@ export async function sendOtp(phone, code) {
   const to = normalisePhone(phone);
   if (!to) return { sent: false, reason: 'No usable phone number' };
 
-  const url = `${process.env.WATI_BASE_URL}/api/v1/sendTemplateMessage?whatsappNumber=${to}`;
+  const value = String(code || '').trim();
+  if (!value) return { sent: false, reason: 'Refusing to send a blank code (Meta rejects it).' };
+
+  const url = `${process.env.WATI_BASE_URL}/api/v1/sendTemplateMessage?whatsappNumber=${encodeURIComponent(to)}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -47,15 +50,20 @@ export async function sendOtp(phone, code) {
       broadcast_name: `pwd_reset_${Date.now()}`,
       // Authentication templates take exactly one parameter for the code, and the Copy-code
       // button reads that same value.
-      parameters: [{ name: '1', value: String(code) }],
+      parameters: [{ name: '1', value }],
     }),
   });
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.result === false) {
-    const why = data.info || data.message || `HTTP ${res.status}`;
+  const text = await res.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch { /* WATI sometimes returns plain text on error */ }
+
+  // WATI answers 200 even when it refuses — the real verdict is in the body.
+  const okFlag = data.result === true || data.result === 'success' || data.validWhatsAppNumber === true;
+  if (!res.ok || data.result === false || data.result === 'failure') {
+    const why = data.info || data.message || (typeof text === 'string' ? text.slice(0, 300) : `HTTP ${res.status}`);
     console.error('WATI send failed:', why);
-    return { sent: false, reason: why };
+    return { sent: false, reason: why, raw: data };
   }
-  return { sent: true };
+  return { sent: true, raw: data };
 }

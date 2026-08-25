@@ -2,8 +2,8 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { one, q } from '../db.js';
 import crypto from 'crypto';
-import { signToken, requireAuth } from '../auth.js';
-import { sendOtp, normalisePhone } from '../services/wati.js';
+import { signToken, requireAuth, requireSuperAdmin } from '../auth.js';
+import { sendOtp, normalisePhone, watiConfigured } from '../services/wati.js';
 
 const r = Router();
 
@@ -136,6 +136,40 @@ r.post('/reset-password', async (req, res) => {
   await q('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(newPassword, 10), user.id]);
   await q('DELETE FROM password_otps WHERE user_id=$1', [user.id]);
   res.json({ ok: true });
+});
+
+
+/**
+ * WATI diagnostic. Super admin only. Sends a real test code to ?phone= (or your own number on
+ * file) and returns exactly what WATI said — so a failed reset can be diagnosed without digging
+ * through server logs. Mirrors the /reports/wati-test endpoint on the other portals.
+ */
+r.get('/wati-test', requireAuth, requireSuperAdmin, async (req, res) => {
+  const config = {
+    WATI_BASE_URL: process.env.WATI_BASE_URL ? 'set' : 'MISSING',
+    WATI_TOKEN: process.env.WATI_TOKEN ? 'set' : 'MISSING',
+    template: process.env.WATI_OTP_TEMPLATE || 'otp_password2',
+    configured: watiConfigured(),
+  };
+
+  let phone = req.query.phone;
+  if (!phone) {
+    const me = await one('SELECT phone FROM users WHERE id=$1', [req.user.id]);
+    phone = me?.phone;
+  }
+  if (!phone)
+    return res.json({ config, error: 'No phone to test. Add ?phone=91XXXXXXXXXX or set your own mobile.' });
+
+  const result = await sendOtp(phone, '123456'); // a fixed obvious test code
+  res.json({
+    config,
+    normalised_number: normalisePhone(phone),
+    result,
+    hint:
+      result.sent
+        ? 'WATI accepted it. If no message arrives: the number has no WhatsApp, or the template is not approved/live.'
+        : 'WATI rejected it — see result.reason above.',
+  });
 });
 
 export default r;
