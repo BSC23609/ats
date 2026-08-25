@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, useAuth, date, experienceRange } from '../api.jsx';
 import RichText from '../components/RichText.jsx';
 
@@ -6,6 +6,10 @@ export default function Jobs() {
   const { user } = useAuth();
   const companies = user.companies || [];
   const [rows, setRows] = useState([]);
+  const multiCompany = companies.length > 1;
+  const [fCompany, setFCompany] = useState('');   // company_code, '' = all
+  const [fStatus, setFStatus] = useState('');     // OPEN | CLOSED | '' = all
+  const [fPosted, setFPosted] = useState('');     // 7 | 30 | 90 days, '' = any time
   const [adding, setAdding] = useState(false);
   const [desc, setDesc] = useState('');        // the rich-text description in the create form
   const [editing, setEditing] = useState(null); // the opening being edited, as a working copy
@@ -20,6 +24,22 @@ export default function Jobs() {
   const [error, setError] = useState('');
 
   const load = () => api.get('/jobs').then(setRows).catch((e) => setError(e.message));
+
+  // All rows are already in hand, so filtering is instant and needs no round-trip.
+  const shown = useMemo(() => {
+    const now = Date.now();
+    return rows.filter((j) => {
+      if (fCompany && j.company_code !== fCompany) return false;
+      if (fStatus && j.status !== fStatus) return false;
+      if (fPosted) {
+        const age = (now - new Date(j.created_at).getTime()) / 86400000;
+        if (age > Number(fPosted)) return false;
+      }
+      return true;
+    });
+  }, [rows, fCompany, fStatus, fPosted]);
+
+  const filtersActive = fCompany || fStatus || fPosted;
 
   // Braces matter: passing `load` directly would hand React the promise it returns, and React
   // would try to call that promise as a cleanup function when you navigate away — "n is not a function".
@@ -142,6 +162,45 @@ export default function Jobs() {
 
       {msg && <div className="success" style={{ marginBottom: 16 }}>{msg}</div>}
       {error && !adding && !jd && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
+
+      {!adding && rows.length > 0 && (
+        <div className="row" style={{ marginBottom: 16, gap: 10, alignItems: 'flex-end' }}>
+          {multiCompany && (
+            <div>
+              <label style={{ marginBottom: 4 }}>Company</label>
+              <select value={fCompany} onChange={(e) => setFCompany(e.target.value)} style={{ width: 190 }}>
+                <option value="">All companies</option>
+                {companies.map((c) => <option key={c.id} value={c.code}>{c.code} — {c.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <label style={{ marginBottom: 4 }}>Status</label>
+            <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} style={{ width: 150 }}>
+              <option value="">Open &amp; closed</option>
+              <option value="OPEN">Open only</option>
+              <option value="CLOSED">Closed only</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ marginBottom: 4 }}>Posted</label>
+            <select value={fPosted} onChange={(e) => setFPosted(e.target.value)} style={{ width: 150 }}>
+              <option value="">Any time</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </div>
+          {filtersActive && (
+            <button className="ghost small" onClick={() => { setFCompany(''); setFStatus(''); setFPosted(''); }}>
+              Clear
+            </button>
+          )}
+          <div className="sub" style={{ marginLeft: 'auto', alignSelf: 'center' }}>
+            {shown.length} of {rows.length}
+          </div>
+        </div>
+      )}
 
       {doomed && (
         <div className="overlay" onClick={(e) => e.target === e.currentTarget && setDoomed(null)}>
@@ -357,13 +416,22 @@ export default function Jobs() {
       <div className="panel">
         {!rows.length ? (
           <div className="empty"><h3>No openings yet</h3><p>Post one and it goes live on the careers page.</p></div>
+        ) : !shown.length ? (
+          <div className="empty">
+            <h3>No openings match</h3>
+            <p>Nothing fits these filters.{' '}
+              <button className="ghost small" onClick={() => { setFCompany(''); setFStatus(''); setFPosted(''); }}>
+                Clear filters
+              </button>
+            </p>
+          </div>
         ) : (
           <table>
             <thead>
-              <tr><th>Role</th><th>Location</th><th>Min. experience</th><th>Job description</th><th>Applicants</th><th>Status</th><th></th></tr>
+              <tr><th>Role</th><th>Location</th><th>Min. experience</th><th>Job description</th><th>Applicants</th><th>Status</th><th>Posted</th><th></th></tr>
             </thead>
             <tbody>
-              {rows.map((j) => (
+              {shown.map((j) => (
                 <tr key={j.id} style={{ cursor: 'default' }}>
                   <td className="co" style={{ borderLeftColor: j.colour }}>
                     <div className="name">{j.title}</div>
@@ -378,6 +446,7 @@ export default function Jobs() {
                   </td>
                   <td><strong>{j.applicant_count}</strong></td>
                   <td><span className={`chip ${j.status === 'OPEN' ? 'JOINED' : j.status === 'CLOSED' ? 'REJECTED' : 'ON_HOLD'}`}>{j.status}</span></td>
+                  <td className="sub">{date(j.created_at)}</td>
                   <td>
                     <div className="row">
                       <button className="ghost small" onClick={() => openEdit(j)}>Edit</button>
