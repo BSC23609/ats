@@ -65,6 +65,8 @@ export default function Settings() {
             <dl className="kv">
               <dt>Name</dt><dd>{user.name}</dd>
               <dt>Sign-in email</dt><dd>{user.email}</dd>
+              <dt>WhatsApp mobile</dt>
+              <dd>{user.phone || <span className="sub">Not set — you can’t reset by WhatsApp until a super admin adds it</span>}</dd>
               <dt>Role</dt><dd>{user.role === 'SUPER_ADMIN' ? 'Super admin' : 'HR admin'}</dd>
               <dt>Companies</dt>
               <dd>

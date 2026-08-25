@@ -199,7 +199,7 @@ users.get('/companies', async (_req, res) => {
 /** One row per admin, with every company they look after folded in. */
 users.get('/', requireSuperAdmin, async (_req, res) => {
   const { rows } = await q(
-    `SELECT u.id, u.name, u.email, u.role, u.active, u.created_at,
+    `SELECT u.id, u.name, u.email, u.role, u.active, u.phone, u.created_at,
             COALESCE(
               (SELECT json_agg(json_build_object('id', c.id, 'code', c.code, 'colour', c.colour) ORDER BY c.id)
                  FROM user_companies uc JOIN companies c ON c.id = uc.company_id
@@ -213,7 +213,7 @@ users.get('/', requireSuperAdmin, async (_req, res) => {
 });
 
 users.post('/', requireSuperAdmin, async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, phone } = req.body;
   const companyIds = (req.body.company_ids || []).map(Number).filter(Boolean);
 
   if (!name || !email || !password || !role)
@@ -225,9 +225,9 @@ users.post('/', requireSuperAdmin, async (req, res) => {
   try {
     const created = await tx(async (client) => {
       const { rows } = await client.query(
-        `INSERT INTO users (name, email, password_hash, role)
-         VALUES ($1,$2,$3,$4) RETURNING id, name, email, role, active`,
-        [name, email.toLowerCase(), await bcrypt.hash(password, 10), role]
+        `INSERT INTO users (name, email, password_hash, role, phone)
+         VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, role, active`,
+        [name, email.toLowerCase(), await bcrypt.hash(password, 10), role, phone || null]
       );
       const user = rows[0];
       // A super admin reaches every company by role, so no rows are written for them.
@@ -254,7 +254,7 @@ users.patch('/:id', requireSuperAdmin, async (req, res) => {
 
   const sets = [];
   const vals = [];
-  for (const k of ['name', 'email', 'active', 'role']) {
+  for (const k of ['name', 'email', 'active', 'role', 'phone']) {
     if (k in req.body) {
       sets.push(`${k}=$${sets.length + 1}`);
       vals.push(k === 'email' ? String(req.body[k]).toLowerCase().trim() : req.body[k]);

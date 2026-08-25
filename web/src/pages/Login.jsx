@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../api.jsx';
+import ForgotPassword from './ForgotPassword.jsx';
 
 /**
  * The backdrop is a portal frame — the structure Metfraa actually erects — drawn in the
@@ -50,6 +51,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [forgot, setForgot] = useState(false);
 
   if (loading) return <div className="center">Loading…</div>;
   if (user) return <Navigate to="/pipeline" replace />;
@@ -81,6 +83,10 @@ export default function Login() {
           <i style={{ background: '#0a6eb4' }} />
         </div>
 
+        {forgot ? (
+          <ForgotPassword onCancel={() => setForgot(false)} onDone={() => setForgot(false)} />
+        ) : (
+          <>
         <div className="eyebrow" style={{ marginBottom: 8 }}>Recruitment</div>
         <h1>Sign in</h1>
         <p className="lead">For HR admins. Candidates apply through the careers page.</p>
@@ -95,7 +101,12 @@ export default function Login() {
           </div>
 
           <div className="field">
-            <label htmlFor="password">Password</label>
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 5 }}>
+              <label htmlFor="password" style={{ margin: 0 }}>Password</label>
+              <button type="button" className="linklike" onClick={() => setForgot(true)}>
+                Forgot?
+              </button>
+            </div>
             <input id="password" type="password" autoComplete="current-password"
                    value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
@@ -106,6 +117,8 @@ export default function Login() {
         <div className="signin-foot">
           Applying for a job? <Link to="/careers">See the open roles</Link>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

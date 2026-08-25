@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, date } from '../api.jsx';
 
-const BLANK = { name: '', email: '', role: 'HR_ADMIN', company_ids: [], active: true, password: '' };
+const BLANK = { name: '', email: '', phone: '', role: 'HR_ADMIN', company_ids: [], active: true, password: '' };
 
 export default function Users() {
   const [rows, setRows] = useState([]);
@@ -32,6 +32,7 @@ export default function Users() {
       id: u.id,
       name: u.name,
       email: u.email,
+      phone: u.phone || '',
       role: u.role,
       active: u.active,
       company_ids: (u.companies || []).map((c) => c.id),
@@ -60,6 +61,7 @@ export default function Users() {
       const body = {
         name: form.name,
         email: form.email,
+        phone: form.phone,
         role: form.role,
         active: form.active,
         company_ids: form.role === 'HR_ADMIN' ? form.company_ids : [],
@@ -188,6 +190,16 @@ export default function Users() {
                   <input id="u_email" type="email" required value={form.email}
                          onChange={(e) => setForm({ ...form, email: e.target.value })} />
                 </div>
+              </div>
+
+              <div className="field">
+                <label htmlFor="u_phone">
+                  WhatsApp mobile
+                  <span style={{ fontWeight: 400 }}> — for password resets. Include country code, e.g. 91…</span>
+                </label>
+                <input id="u_phone" value={form.phone}
+                       placeholder="9198XXXXXXXX"
+                       onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
 
               <div className="field">

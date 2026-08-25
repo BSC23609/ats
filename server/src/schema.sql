@@ -29,8 +29,21 @@ CREATE TABLE users (
   password_hash TEXT NOT NULL,
   role          TEXT NOT NULL CHECK (role IN ('SUPER_ADMIN','HR_ADMIN')),
   active        BOOLEAN NOT NULL DEFAULT TRUE,
+  phone         TEXT,                    -- E.164-ish, for the WhatsApp password reset
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- One-time codes for password reset. A row is created when a code is requested and
+-- deleted the moment it is used, so the table only ever holds live codes.
+CREATE TABLE IF NOT EXISTS password_otps (
+  id           SERIAL PRIMARY KEY,
+  user_id      INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash    TEXT NOT NULL,            -- the code is hashed, never stored in the clear
+  expires_at   TIMESTAMPTZ NOT NULL,
+  attempts     INT NOT NULL DEFAULT 0,   -- wrong guesses; the code dies after a few
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_password_otps_user ON password_otps(user_id);
 
 -- One HR admin can look after several companies. Super admins are not listed here;
 -- they reach every company by role.

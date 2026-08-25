@@ -1,14 +1,16 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { one, q } from '../db.js';
+import crypto from 'crypto';
 import { signToken, requireAuth } from '../auth.js';
+import { sendOtp, normalisePhone } from '../services/wati.js';
 
 const r = Router();
 
 /** Name, role and the companies this person looks after. */
 async function profile(userId) {
   const user = await one(
-    `SELECT id, name, email, role, active FROM users WHERE id = $1`,
+    `SELECT id, name, email, role, active, phone FROM users WHERE id = $1`,
     [userId]
   );
   if (!user) return null;
@@ -56,6 +58,83 @@ r.post('/change-password', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Current password is wrong.' });
 
   await q('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(new_password, 10), req.user.id]);
+  res.json({ ok: true });
+});
+
+
+/* ------------------------------------------------------------------ *
+ *  Password reset over WhatsApp
+ *
+ *  Two steps: request a code, then submit the code with a new password.
+ *  Design points, all deliberate:
+ *   - The request endpoint ALWAYS replies the same way, whether or not the email exists. Telling
+ *     a stranger "no such account" hands them a way to discover who has logins.
+ *   - The code is six digits, hashed before storage, valid ten minutes, and dies after five wrong
+ *     guesses — so it can't be brute-forced in its short life.
+ *   - Any older codes for the same user are cleared when a new one is issued.
+ * ------------------------------------------------------------------ */
+
+const OTP_TTL_MIN = 10;
+const OTP_MAX_ATTEMPTS = 5;
+const hashCode = (code) => crypto.createHash('sha256').update(String(code)).digest('hex');
+
+r.post('/forgot-password', async (req, res) => {
+  const email = String(req.body.email || '').toLowerCase().trim();
+  // The same answer either way — never reveal whether an account exists.
+  const vague = { ok: true, message: 'If that email has an account with a mobile number on file, a code is on its way.' };
+  if (!email) return res.json(vague);
+
+  const user = await one('SELECT id, phone, active FROM users WHERE email=$1', [email]);
+  if (!user || !user.active || !user.phone) return res.json(vague);
+
+  const code = String(crypto.randomInt(100000, 1000000)); // always six digits
+  await q('DELETE FROM password_otps WHERE user_id=$1', [user.id]); // one live code at a time
+  await q(
+    `INSERT INTO password_otps (user_id, code_hash, expires_at)
+     VALUES ($1, $2, now() + interval '${OTP_TTL_MIN} minutes')`,
+    [user.id, hashCode(code)]
+  );
+
+  const sent = await sendOtp(user.phone, code);
+  if (!sent.sent) console.error(`OTP for user ${user.id} not delivered: ${sent.reason}`);
+
+  // Still vague — a WATI hiccup should not become a way to probe accounts.
+  res.json(vague);
+});
+
+r.post('/reset-password', async (req, res) => {
+  const email = String(req.body.email || '').toLowerCase().trim();
+  const code = String(req.body.code || '').trim();
+  const newPassword = req.body.new_password || '';
+
+  if (newPassword.length < 8)
+    return res.status(400).json({ error: 'The new password must be at least 8 characters.' });
+
+  const user = await one('SELECT id FROM users WHERE email=$1 AND active', [email]);
+  if (!user) return res.status(400).json({ error: 'That code is wrong or has expired.' });
+
+  const otp = await one(
+    'SELECT * FROM password_otps WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1',
+    [user.id]
+  );
+  if (!otp) return res.status(400).json({ error: 'That code is wrong or has expired.' });
+
+  if (new Date(otp.expires_at) < new Date()) {
+    await q('DELETE FROM password_otps WHERE id=$1', [otp.id]);
+    return res.status(400).json({ error: 'That code has expired. Ask for a new one.' });
+  }
+  if (otp.attempts >= OTP_MAX_ATTEMPTS) {
+    await q('DELETE FROM password_otps WHERE id=$1', [otp.id]);
+    return res.status(400).json({ error: 'Too many wrong tries. Ask for a new code.' });
+  }
+  if (otp.code_hash !== hashCode(code)) {
+    await q('UPDATE password_otps SET attempts = attempts + 1 WHERE id=$1', [otp.id]);
+    return res.status(400).json({ error: 'That code is wrong or has expired.' });
+  }
+
+  // Correct. Set the password and burn the code.
+  await q('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(newPassword, 10), user.id]);
+  await q('DELETE FROM password_otps WHERE user_id=$1', [user.id]);
   res.json({ ok: true });
 });
 

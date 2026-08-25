@@ -27,6 +27,16 @@ export async function migrate() {
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS city    TEXT`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS pincode TEXT`,
     `ALTER TABLE jobs         ADD COLUMN IF NOT EXISTS max_experience INT`,
+    `ALTER TABLE users        ADD COLUMN IF NOT EXISTS phone TEXT`,
+    `CREATE TABLE IF NOT EXISTS password_otps (
+       id SERIAL PRIMARY KEY,
+       user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+       code_hash TEXT NOT NULL,
+       expires_at TIMESTAMPTZ NOT NULL,
+       attempts INT NOT NULL DEFAULT 0,
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+     )`,
+    `CREATE INDEX IF NOT EXISTS idx_password_otps_user ON password_otps(user_id)`,
   ];
   for (const sql of steps) {
     try {
