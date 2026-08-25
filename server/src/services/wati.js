@@ -42,7 +42,10 @@ export async function sendOtp(phone, code) {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.WATI_TOKEN}`,
+      // WATI's dashboard sometimes gives the token already prefixed with "Bearer ". Don't double it.
+      Authorization: String(process.env.WATI_TOKEN).startsWith('Bearer')
+        ? process.env.WATI_TOKEN
+        : `Bearer ${process.env.WATI_TOKEN}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -56,14 +59,27 @@ export async function sendOtp(phone, code) {
 
   const text = await res.text();
   let data = {};
-  try { data = JSON.parse(text); } catch { /* WATI sometimes returns plain text on error */ }
+  try { data = JSON.parse(text); } catch { /* WATI sometimes returns plain text */ }
 
-  // WATI answers 200 even when it refuses — the real verdict is in the body.
-  const okFlag = data.result === true || data.result === 'success' || data.validWhatsAppNumber === true;
-  if (!res.ok || data.result === false || data.result === 'failure') {
-    const why = data.info || data.message || (typeof text === 'string' ? text.slice(0, 300) : `HTTP ${res.status}`);
+  // Match the logic proven on the other group portals: WATI is a success UNLESS it explicitly
+  // declines. A 200 with a sparse body is an accept — treating it as failure (as before) is what
+  // produced "rejected" with an empty reason. Only an HTTP error, or result:false /
+  // validWhatsAppNumber:false in the body, is a real rejection.
+  const declined =
+    !res.ok ||
+    data.result === false ||
+    data.result === 'false' ||
+    data.validWhatsAppNumber === false;
+
+  if (declined) {
+    const why =
+      data.info ||
+      data.message ||
+      (data.error && (data.error.message || data.error)) ||
+      (text ? text.slice(0, 400) : `HTTP ${res.status} with an empty body`);
     console.error('WATI send failed:', why);
-    return { sent: false, reason: why, raw: data };
+    return { sent: false, reason: String(why), status: res.status, raw: data, body: text.slice(0, 600) };
   }
-  return { sent: true, raw: data };
+
+  return { sent: true, status: res.status, raw: data, body: text.slice(0, 600) };
 }
