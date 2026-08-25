@@ -6,6 +6,18 @@ export default function Settings() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [wati, setWati] = useState(null);     // {loading} | result JSON
+
+
+  const testWati = async () => {
+    setWati({ loading: true });
+    try {
+      const res = await api.get('/auth/wati-test');   // uses my number on file
+      setWati(res);
+    } catch (err) {
+      setWati({ error: err.message });
+    }
+  };
 
   const savePassword = async (e) => {
     e.preventDefault();
@@ -81,6 +93,43 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      {user.role === 'SUPER_ADMIN' && (
+        <div className="panel" style={{ marginTop: 16 }}>
+          <div className="panel-head"><h2>WhatsApp (WATI) check</h2></div>
+          <div className="panel-body">
+            <p className="sub" style={{ marginTop: 0 }}>
+              Sends a test code to your own number on file and reports exactly what WATI said.
+              Use this to diagnose password-reset delivery.
+            </p>
+            <button className="ghost" onClick={testWati} disabled={wati?.loading}>
+              {wati?.loading ? 'Testing…' : 'Send a test code to me'}
+            </button>
+
+            {wati && !wati.loading && (
+              <div style={{ marginTop: 14 }}>
+                {wati.error ? (
+                  <div className="error">{wati.error}</div>
+                ) : wati.result?.sent ? (
+                  <div className="success">
+                    WATI accepted the message for {wati.normalised_number}. If nothing arrives, the number
+                    has no WhatsApp or the template isn’t live.
+                  </div>
+                ) : (
+                  <div className="error">
+                    WATI rejected it: {wati.result?.reason || 'unknown reason'}
+                  </div>
+                )}
+                <pre style={{
+                  marginTop: 12, background: '#f5f6f5', border: '1px solid var(--line)',
+                  borderRadius: 3, padding: 12, fontSize: 12, overflowX: 'auto',
+                  fontFamily: 'var(--f-mono)'
+                }}>{JSON.stringify(wati, null, 2)}</pre>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
