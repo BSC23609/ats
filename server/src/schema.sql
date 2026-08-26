@@ -103,6 +103,7 @@ CREATE TABLE applications (
   resume_text        TEXT,
   ai_summary         JSONB,                          -- see services/resume.js
   ai_status          TEXT DEFAULT 'PENDING' CHECK (ai_status IN ('PENDING','DONE','FAILED','SKIPPED')),
+  ai_error           TEXT,
 
   -- Stage 2: full application form, filled on interview day via token link
   stage2_token       TEXT UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(16),'hex'),

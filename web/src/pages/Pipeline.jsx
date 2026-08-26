@@ -21,7 +21,7 @@ export default function Pipeline() {
 
   const scope = company ? `company=${company}` : '';
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
     const qs = new URLSearchParams();
     if (company) qs.set('company', company);
@@ -29,13 +29,15 @@ export default function Pipeline() {
     if (search) qs.set('q', search);
     if (sort === 'score') qs.set('sort', 'score');
 
-    Promise.all([
+    return Promise.all([
       api.get(`/applications?${qs}`),
       api.get(`/applications/stats?${scope}`),
     ])
       .then(([list, s]) => { setRows(list); setStats(s.rows); })
       .finally(() => setLoading(false));
-  }, [company, status, search, sort, scope]);
+  };
+
+  useEffect(() => { load(); }, [company, status, search, sort, scope]);
 
   const counts = useMemo(() => {
     const map = {};
@@ -144,15 +146,27 @@ export default function Pipeline() {
                     ) : a.ai_status === 'PENDING' ? (
                       <span className="sub">Reading resume…</span>
                     ) : a.ai_status === 'FAILED' ? (
-                      <span className="sub">Could not read the resume</span>
+                      <span className="sub" title={a.ai_error || ''}>
+                        {a.ai_error || 'Could not read the resume'}
+                      </span>
+                    ) : a.resume_filename ? (
+                      <span className="sub">Not scored yet</span>
                     ) : (
                       <span className="sub">No resume attached</span>
                     )}
                     {a.resume_filename && (
-                      <button className="ghost small" style={{ marginTop: 6 }}
-                              onClick={(e) => { e.stopPropagation(); setResumeFor({ id: a.id, name: a.resume_filename }); }}>
-                        View resume
-                      </button>
+                      <div className="row" style={{ gap: 6, marginTop: 6 }}>
+                        <button className="ghost small"
+                                onClick={(e) => { e.stopPropagation(); setResumeFor({ id: a.id, name: a.resume_filename }); }}>
+                          View resume
+                        </button>
+                        {(a.ai_status === 'FAILED' || a.ai_status === 'SKIPPED') && (
+                          <button className="ghost small"
+                                  onClick={(e) => { e.stopPropagation(); retryScore(a.id); }}>
+                            Retry
+                          </button>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td>{a.total_experience} yrs{a.notice_period_days != null && <div className="sub">{a.notice_period_days}d notice</div>}</td>

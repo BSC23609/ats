@@ -28,6 +28,7 @@ export async function migrate() {
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS pincode TEXT`,
     `ALTER TABLE jobs         ADD COLUMN IF NOT EXISTS max_experience INT`,
     `ALTER TABLE users        ADD COLUMN IF NOT EXISTS phone TEXT`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_error TEXT`,
     `CREATE TABLE IF NOT EXISTS password_otps (
        id SERIAL PRIMARY KEY,
        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

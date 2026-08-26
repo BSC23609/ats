@@ -130,7 +130,8 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
           });
         } catch (err) {
           console.error('resume processing failed:', err.message);
-          await q(`UPDATE applications SET ai_status='FAILED' WHERE id=$1`, [app.id]);
+          await q(`UPDATE applications SET ai_status='FAILED', ai_error=$2 WHERE id=$1`,
+                  [app.id, err.message.slice(0, 300)]);
         }
       })();
     } else {

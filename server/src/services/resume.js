@@ -1,21 +1,67 @@
-import { createRequire } from 'module';
-import mammoth from 'mammoth';
 import { q } from '../db.js';
 
-const require = createRequire(import.meta.url);
+/** Pull plain text out of a resume buffer, robustly, and tell the caller WHY if it can't. */
+export async function extractText(buffer, mimetype = '', filename = '') {
+  const name = (filename || '').toLowerCase();
+  const isPdf = mimetype.includes('pdf') || name.endsWith('.pdf') ||
+                (buffer && buffer.slice(0, 5).toString('latin1') === '%PDF-'); // sniff the magic bytes
+  const isDocx = mimetype.includes('word') || mimetype.includes('officedocument') || name.endsWith('.docx');
+  const isDoc = name.endsWith('.doc') && !name.endsWith('.docx');
 
-/** Pull plain text out of a resume held in memory, whatever the source store. */
-export async function extractText(buffer, mimetype, filename = '') {
-  if (mimetype === 'application/pdf') {
-    const pdfParse = require('pdf-parse');
-    const { text } = await pdfParse(buffer);
+  if (isDoc) {
+    // Old binary .doc has no reliable pure-JS parser; ask for a PDF or DOCX instead.
+    const e = new Error('Old .doc format cannot be read. Ask the candidate for a PDF or DOCX.');
+    e.code = 'UNSUPPORTED';
+    throw e;
+  }
+
+  if (isPdf) {
+    // pdfjs-dist is maintained and does not run test code on import (unlike pdf-parse@1.1.1,
+    // which crashes on load in some deploys).
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const doc = await pdfjs.getDocument({
+      data: new Uint8Array(buffer),
+      useSystemFonts: true,
+      isEvalSupported: false,
+    }).promise;
+
+    let text = '';
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const content = await page.getTextContent();
+      text += content.items.map((i) => i.str).join(' ') + '\n';
+    }
+    text = text.trim();
+
+    if (!text) {
+      // A scanned/photographed resume is an image with no text layer. Nothing to extract.
+      const e = new Error('This PDF has no readable text — it looks scanned or image-only. Ask for a text PDF.');
+      e.code = 'NO_TEXT';
+      throw e;
+    }
     return text;
   }
-  if (mimetype.includes('word') || filename.endsWith('.docx')) {
+
+  if (isDocx) {
+    const mammoth = (await import('mammoth')).default;
     const { value } = await mammoth.extractRawText({ buffer });
-    return value;
+    const text = (value || '').trim();
+    if (!text) {
+      const e = new Error('This document appears to be empty.');
+      e.code = 'NO_TEXT';
+      throw e;
+    }
+    return text;
   }
-  return buffer.toString('utf8');
+
+  // Last resort: treat as plain text.
+  const text = buffer.toString('utf8').trim();
+  if (!text) {
+    const e = new Error('Could not read any text from this file.');
+    e.code = 'NO_TEXT';
+    throw e;
+  }
+  return text;
 }
 
 const INSTRUCTIONS = `You are a recruitment analyst for the Bharat Steel Group (Chennai) — a steel trading,
@@ -160,6 +206,7 @@ export async function summariseResume(
     ]);
   } catch (err) {
     console.error(`resume summary failed for application ${applicationId}:`, err.message);
-    await q(`UPDATE applications SET ai_status='FAILED' WHERE id=$1`, [applicationId]);
+    await q(`UPDATE applications SET ai_status='FAILED', ai_error=$2 WHERE id=$1`,
+            [applicationId, err.message.slice(0, 300)]);
   }
 }

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { one, q, tx } from '../db.js';
 import { requireAuth, companyFilter, assertCompanyAccess } from '../auth.js';
 import multer from 'multer';
-import { summariseResume } from '../services/resume.js';
+import { summariseResume, extractText } from '../services/resume.js';
 import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
@@ -33,7 +33,7 @@ r.get('/', async (req, res) => {
   const { rows } = await q(
     `SELECT a.id, a.ref_code, a.full_name, a.email, a.phone, a.position_applied, a.status,
             a.total_experience, a.expected_ctc, a.notice_period_days, a.created_at, a.interview_at,
-            a.stage2_submitted_at, a.ai_status, a.resume_filename,
+            a.stage2_submitted_at, a.ai_status, a.ai_error, a.resume_filename,
             a.ai_summary->>'headline'      AS ai_headline,
             a.ai_summary->>'fit_for_role'  AS ai_fit,
             (a.ai_summary->>'score')::numeric AS ai_score,
@@ -118,22 +118,42 @@ r.post('/:id/reanalyse', async (req, res) => {
   );
   if (!app) return res.status(404).json({ error: 'Application not found.' });
   if (!assertCompanyAccess(req, res, app.company_id)) return;
-  if (!app.resume_text) return res.status(400).json({ error: 'No resume text to analyse.' });
+  if (!app.resume_text && !app.resume_path)
+    return res.status(400).json({ error: 'This candidate has no resume on file.' });
 
   const job = app.job_id
-    ? await one('SELECT jd_text, description, min_experience, max_experience FROM jobs WHERE id=$1', [app.job_id])
+    ? await one('SELECT jd_text, description, min_experience, max_experience, location FROM jobs WHERE id=$1', [app.job_id])
     : null;
 
-  await q(`UPDATE applications SET ai_status='PENDING' WHERE id=$1`, [app.id]);
+  await q(`UPDATE applications SET ai_status='PENDING', ai_error=NULL WHERE id=$1`, [app.id]);
   res.json({ ok: true });
-  summariseResume(app.id, {
-    resumeText: app.resume_text,
-    position: app.position_applied,
-    company: app.company_name,
-    experience: app.total_experience,
-    jobDescription: job?.jd_text || toText(job?.description),
-    experienceRange: describeRange(job?.min_experience, job?.max_experience),
-  });
+
+  // Run in the background so the button returns instantly.
+  (async () => {
+    try {
+      let text = app.resume_text;
+      // A failed extraction leaves no text — pull the file back from storage and try again.
+      if (!text && app.resume_path) {
+        const buffer = await getFile(app.resume_path);
+        text = await extractText(buffer, '', app.resume_filename || '');
+        await q('UPDATE applications SET resume_text=$1 WHERE id=$2', [text, app.id]);
+      }
+      await summariseResume(app.id, {
+        resumeText: text,
+        position: app.position_applied,
+        company: app.company_name,
+        experience: app.total_experience,
+        jobDescription: job?.jd_text || toText(job?.description),
+        experienceRange: describeRange(job?.min_experience, job?.max_experience),
+        jobLocation: job?.location,
+        candidateLocation: [app.area, app.city, app.pincode].map((x) => (x || '').trim()).filter(Boolean).join(', ') || app.current_location,
+      });
+    } catch (err) {
+      console.error('reanalyse failed:', err.message);
+      await q(`UPDATE applications SET ai_status='FAILED', ai_error=$2 WHERE id=$1`,
+              [app.id, err.message.slice(0, 300)]);
+    }
+  })();
 });
 
 /** Move a candidate along the pipeline. JOINED creates the employee record. */
