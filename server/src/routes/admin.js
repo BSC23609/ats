@@ -8,6 +8,7 @@ import { extractText, summariseResume } from '../services/resume.js';
 import { putFile, deleteFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { syncWorkbook } from '../services/workbook.js';
+import { describeRange } from '../services/html.js';
 import { sanitise } from '../services/html.js';
 
 
@@ -305,13 +306,18 @@ const jdUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const ok = [
+    // Don't trust the browser's mimetype alone — some send application/octet-stream for a PDF.
+    // Accept on either a known mimetype OR a known extension.
+    const okMime = [
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
+      'application/octet-stream',
     ].includes(file.mimetype);
-    cb(ok ? null : new Error('The job description must be a PDF, Word file or plain text, under 8 MB.'), ok);
+    const okExt = /\.(pdf|docx?|txt)$/i.test(file.originalname || '');
+    if (okMime || okExt) return cb(null, true);
+    cb(new Error('The job description must be a PDF, Word file or plain text, under 8 MB.'));
   },
 });
 
@@ -343,7 +349,8 @@ jobs.post('/:id/jd', jdUpload.single('jd'), async (req, res, next) => {
     // Scores are only comparable if every candidate was scored against the same JD, so
     // re-score everyone already in the pipeline for this role.
     const { rows: apps } = await q(
-      `SELECT a.id, a.resume_text, a.position_applied, a.total_experience, c.name AS company_name
+      `SELECT a.id, a.resume_text, a.position_applied, a.total_experience,
+              a.area, a.city, a.pincode, a.current_location, c.name AS company_name
          FROM applications a JOIN companies c ON c.id = a.company_id
         WHERE a.job_id = $1 AND a.resume_text IS NOT NULL`,
       [job.id]
@@ -352,6 +359,7 @@ jobs.post('/:id/jd', jdUpload.single('jd'), async (req, res, next) => {
 
     res.json({ ok: true, characters: text.length, rescoring: apps.length });
 
+    const range = describeRange(job.min_experience, job.max_experience);
     for (const a of apps)
       await summariseResume(a.id, {
         resumeText: a.resume_text,
@@ -359,6 +367,10 @@ jobs.post('/:id/jd', jdUpload.single('jd'), async (req, res, next) => {
         company: a.company_name,
         experience: a.total_experience,
         jobDescription: text,
+        experienceRange: range,
+        jobLocation: job.location,
+        candidateLocation:
+          [a.area, a.city, a.pincode].map((x) => (x || '').trim()).filter(Boolean).join(', ') || a.current_location,
       });
   } catch (err) {
     next(err);
