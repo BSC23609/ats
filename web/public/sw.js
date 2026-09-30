@@ -1,4 +1,4 @@
-const CACHE = 'ats-shell-v1';
+const CACHE = 'ats-shell-v2';   // bumped: forces every browser to drop the buggy v1 worker
 const SHELL = ['/', '/index.html', '/favicon.png', '/apple-touch-icon.png',
                '/icon-192.png', '/icon-512.png', '/brand/group.png'];
 
@@ -15,17 +15,25 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
-  // Never cache the API or anything cross-origin (the API lives on onrender.com). Always go to
-  // the network so HR never sees a stale pipeline.
-  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api')) {
+  const req = e.request;
+  const url = new URL(req.url);
+
+  // Only ever touch same-origin GETs for static files. Everything else — POSTs (uploads, logins),
+  // the API, anything cross-origin — is left completely alone: no respondWith, so the browser
+  // handles it normally. This is what stops the SW interfering with the JD upload.
+  if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api')) {
     return;
   }
-  // Static assets: serve from cache, fall back to network, and refresh the cache in passing.
+
   e.respondWith(
-    caches.match(e.request).then((hit) => {
-      const live = fetch(e.request).then((res) => {
-        if (res.ok) caches.open(CACHE).then((c) => c.put(e.request, res.clone()));
+    caches.match(req).then((hit) => {
+      const live = fetch(req).then((res) => {
+        // Clone BEFORE the body is read. Reading and cloning race otherwise, which threw
+        // "Response body is already used". Only cache real, basic (same-origin) 200s.
+        if (res.ok && res.type === 'basic') {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
         return res;
       }).catch(() => hit);
       return hit || live;
