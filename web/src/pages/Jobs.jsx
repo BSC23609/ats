@@ -323,44 +323,54 @@ export default function Jobs() {
       )}
 
       {jd && (
-        <form className="panel" onSubmit={saveJd} style={{ marginBottom: 16 }}>
-          <div className="panel-head">
-            <h2>Job description — {jd.title}</h2>
-            <button type="button" className="ghost small" onClick={() => setJd(null)}>Cancel</button>
-          </div>
-          <div className="panel-body">
-            {error && <div className="error" style={{ marginBottom: 14 }}>{error}</div>}
-            <p style={{ marginTop: 0 }}>
-              Every resume for this role is scored out of 10 against this description, and the candidate page shows
-              which requirements the resume evidences and which it does not. Without a description, the score is
-              based on the job title alone and means very little.
-            </p>
-
-            <div className="field">
-              <label htmlFor="jd_file">Upload the job description — PDF, Word or text</label>
-              <input id="jd_file" type="file" accept=".pdf,.doc,.docx,.txt"
-                     onChange={(e) => setJdFile(e.target.files[0] || null)} />
-            </div>
-
-            <div className="field">
-              <label htmlFor="jd_text">Or paste it in</label>
-              <textarea id="jd_text" value={jdText} onChange={(e) => setJdText(e.target.value)}
-                        style={{ minHeight: 160 }}
-                        placeholder="Responsibilities, required qualifications, years of experience, software, codes…" />
-            </div>
-
-            {jd.has_jd && (
-              <div className="note" style={{ marginBottom: 14 }}>
-                A description is already on file ({jd.jd_filename || 'pasted text'}). Saving a new one replaces it and
-                re-scores every candidate for this role, so the scores stay comparable.
+        <div className="overlay" onClick={(e) => e.target === e.currentTarget && setJd(null)}>
+          <form className="dialog" style={{ maxWidth: 620 }} onSubmit={saveJd}
+                role="dialog" aria-modal="true">
+            <div className="dialog-head">
+              <div>
+                <div className="eyebrow">Job description</div>
+                <h2>{jd.title}</h2>
               </div>
-            )}
+              <button type="button" className="dialog-close" onClick={() => setJd(null)} aria-label="Close">&times;</button>
+            </div>
 
-            <button type="submit" disabled={busy || (!jdFile && !jdText.trim())}>
-              {busy ? 'Saving…' : 'Save and score candidates'}
-            </button>
-          </div>
-        </form>
+            <div className="dialog-body">
+              {error && <div className="error" style={{ marginBottom: 14 }}>{error}</div>}
+              <p style={{ marginTop: 0 }}>
+                Every resume for this role is scored out of 10 against this description, and the candidate page shows
+                which requirements the resume evidences and which it does not. Without a description, the score is
+                based on the job title alone and means very little.
+              </p>
+
+              <div className="field">
+                <label htmlFor="jd_file">Upload the job description — PDF, Word or text</label>
+                <input id="jd_file" type="file" accept=".pdf,.doc,.docx,.txt"
+                       onChange={(e) => setJdFile(e.target.files[0] || null)} />
+              </div>
+
+              <div className="field">
+                <label htmlFor="jd_text">Or paste it in</label>
+                <textarea id="jd_text" value={jdText} onChange={(e) => setJdText(e.target.value)}
+                          style={{ minHeight: 160 }}
+                          placeholder="Responsibilities, required qualifications, years of experience, software, codes…" />
+              </div>
+
+              {jd.has_jd && (
+                <div className="note" style={{ marginBottom: 0 }}>
+                  A description is already on file ({jd.jd_filename || 'pasted text'}). Saving a new one replaces it and
+                  re-scores every candidate for this role, so the scores stay comparable.
+                </div>
+              )}
+            </div>
+
+            <div className="dialog-foot">
+              <button type="button" className="ghost" onClick={() => setJd(null)}>Cancel</button>
+              <button type="submit" disabled={busy || (!jdFile && !jdText.trim())}>
+                {busy ? 'Saving…' : 'Save and score candidates'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {adding && (
