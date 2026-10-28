@@ -102,12 +102,20 @@ export function AuthProvider({ children }) {
     return u;
   };
 
+  // Group single sign-on: swap the group portal's one-minute token for a normal ATS session.
+  const ssoLogin = async (groupToken) => {
+    const { token: t, user: u } = await api.post('/auth/sso', { token: groupToken });
+    setToken(t);
+    setUser(u);
+    return u;
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
   };
 
-  return <AuthCtx.Provider value={{ user, loading, login, logout }}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{ user, loading, login, ssoLogin, logout }}>{children}</AuthCtx.Provider>;
 }
 
 /* ---------- shared formatting ---------- */

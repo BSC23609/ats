@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './api.jsx';
 import Login from './pages/Login.jsx';
+import GroupSso from './pages/GroupSso.jsx';
 import Careers from './pages/Careers.jsx';
 import FullForm from './pages/FullForm.jsx';
 import Pipeline from './pages/Pipeline.jsx';
@@ -64,6 +65,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/auth/sso" element={<GroupSso />} />
           <Route path="/careers" element={<Careers />} />
           <Route path="/form/:token" element={<FullForm />} />
 

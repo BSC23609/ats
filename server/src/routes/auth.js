@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { one, q } from '../db.js';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { signToken, requireAuth, requireSuperAdmin } from '../auth.js';
 import { sendOtp, normalisePhone, watiConfigured } from '../services/wati.js';
 
@@ -43,6 +44,41 @@ r.post('/login', async (req, res) => {
     return res.status(403).json({ error: 'No company has been assigned to you yet. Ask the super admin.' });
 
   // The token carries company_ids, so a reassignment takes effect the next time they sign in.
+  res.json({ token: signToken(user), user });
+});
+
+/* ------------------------------------------------------------------ *
+ *  Group single sign-on (app.thebharatsteelgroup.com)
+ *  The group portal signs the person in once, then the web app posts its one-minute token here.
+ *  It is signed with GROUP_SSO_SECRET, shared only by the portal and this API. We check it, find
+ *  the user by email and hand back a normal ATS session — the same as a password login.
+ * ------------------------------------------------------------------ */
+r.post('/sso', async (req, res) => {
+  const secret = process.env.GROUP_SSO_SECRET;
+  if (!secret) return res.status(401).json({ error: 'Group sign-in is not set up on ATS yet.' });
+  let claims;
+  try {
+    claims = jwt.verify(String(req.body?.token || ''), secret, {
+      algorithms: ['HS256'], issuer: 'bsg-hub',
+      audience: process.env.GROUP_SSO_APP_KEY || 'ats', clockTolerance: 10,
+    });
+  } catch (e) {
+    return res.status(401).json({ error: e.name === 'TokenExpiredError'
+      ? 'That sign-in link expired. Open ATS again from the group portal.'
+      : 'Group sign-in could not be verified.' });
+  }
+  const ident = String(claims.sub || '').trim().toLowerCase();
+  const email = String(claims.email || '').trim().toLowerCase();
+  const candidates = [ident.includes('@') ? ident : null, email || null].filter(Boolean);
+  let found = null;
+  for (const e of candidates) {
+    found = await one('SELECT id FROM users WHERE lower(email)=$1 AND active', [e]);
+    if (found) break;
+  }
+  if (!found) return res.status(401).json({ error: 'Your group account is not linked to an ATS user. Ask IT to check your email in the group portal.' });
+  const user = await profile(found.id);
+  if (user.role === 'HR_ADMIN' && !user.company_ids.length)
+    return res.status(403).json({ error: 'No company has been assigned to you yet. Ask the super admin.' });
   res.json({ token: signToken(user), user });
 });
 
