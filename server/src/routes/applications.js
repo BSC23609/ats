@@ -7,6 +7,7 @@ import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
 import { syncWorkbook } from '../services/workbook.js';
+import { notifyHrOfApplication } from '../services/notify.js';
 
 const r = Router();
 r.use(requireAuth);
@@ -34,6 +35,7 @@ r.get('/', async (req, res) => {
     `SELECT a.id, a.ref_code, a.full_name, a.email, a.phone, a.position_applied, a.status,
             a.total_experience, a.expected_ctc, a.notice_period_days, a.created_at, a.interview_at,
             a.stage2_submitted_at, a.ai_status, a.ai_error, a.resume_filename,
+            a.notify_status, a.notify_at,
             a.ai_summary->>'headline'      AS ai_headline,
             a.ai_summary->>'fit_for_role'  AS ai_fit,
             (a.ai_summary->>'score')::numeric AS ai_score,
@@ -154,6 +156,22 @@ r.post('/:id/reanalyse', async (req, res) => {
               [app.id, err.message.slice(0, 300)]);
     }
   })();
+});
+
+/** Re-send (or send) the HR notification email for one application. Used by the pipeline's
+    send-log column when a notification failed or was skipped (e.g. email was not yet configured). */
+r.post('/:id/notify', async (req, res, next) => {
+  try {
+    const app = await one('SELECT company_id FROM applications WHERE id=$1', [req.params.id]);
+    if (!app) return res.status(404).json({ error: 'Application not found.' });
+    if (!assertCompanyAccess(req, res, app.company_id)) return;
+
+    const result = await notifyHrOfApplication(Number(req.params.id));
+    if (!result.sent) return res.status(400).json({ error: result.reason || 'Could not send the email.' });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
 /** Move a candidate along the pipeline. JOINED creates the employee record. */

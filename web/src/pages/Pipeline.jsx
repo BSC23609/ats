@@ -39,6 +39,30 @@ export default function Pipeline() {
 
   useEffect(() => { load(); }, [company, status, search, sort, scope]);
 
+  // Re-read and re-score a resume whose extraction or scoring failed.
+  const retryScore = async (id) => {
+    try {
+      await api.post(`/applications/${id}/reanalyse`);
+      load();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Send (or re-send) the HR-notification email for one application.
+  const [notifying, setNotifying] = useState(null);
+  const resendNotify = async (id) => {
+    setNotifying(id);
+    try {
+      await api.post(`/applications/${id}/notify`);
+      await load();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setNotifying(null);
+    }
+  };
+
   const counts = useMemo(() => {
     const map = {};
     stats.forEach((r) => { map[r.status] = (map[r.status] || 0) + r.n; });
@@ -118,6 +142,7 @@ export default function Pipeline() {
                 <th>Form</th>
                 <th>Status</th>
                 <th>Applied</th>
+                <th>HR email</th>
               </tr>
             </thead>
             <tbody>
@@ -176,6 +201,31 @@ export default function Pipeline() {
                   </td>
                   <td><span className={`chip ${a.status}`}>{STATUS_LABEL[a.status]}</span></td>
                   <td className="sub">{date(a.created_at)}</td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    {a.notify_status === 'SENT' ? (
+                      <span className="chip JOINED" title={a.notify_at ? `Sent ${date(a.notify_at)}` : 'Sent'}>
+                        Sent
+                      </span>
+                    ) : a.notify_status === 'FAILED' ? (
+                      <div>
+                        <span className="chip REJECTED" title={a.notify_error || 'Send failed'}>Failed</span>
+                        <button className="ghost small" style={{ marginTop: 5 }}
+                                disabled={notifying === a.id}
+                                onClick={() => resendNotify(a.id)}>
+                          {notifying === a.id ? 'Sending…' : 'Resend'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="sub">Not sent</span>
+                        <button className="ghost small" style={{ marginTop: 5, display: 'block' }}
+                                disabled={notifying === a.id}
+                                onClick={() => resendNotify(a.id)}>
+                          {notifying === a.id ? 'Sending…' : 'Send'}
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -3,6 +3,7 @@ import path from 'path';
 import multer from 'multer';
 import { one, q, tx } from '../db.js';
 import { extractText, summariseResume } from '../services/resume.js';
+import { notifyHrOfApplication } from '../services/notify.js';
 import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
@@ -108,6 +109,10 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
     });
 
     res.status(201).json({ ref_code: app.ref_code, message: 'Application received.' });
+
+    // Email the HR team that a candidate applied. Fire-and-forget — the candidate is never held up,
+    // and the outcome is recorded on the row (notify_status) for the pipeline's send-log column.
+    notifyHrOfApplication(app.id).catch((e) => console.error('HR notify failed:', e.message));
 
     // Read the resume and write the overview in the background — the candidate is not kept waiting.
     if (req.file) {

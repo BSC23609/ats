@@ -127,3 +127,43 @@ export async function checkGraph() {
     return `failed — ${err.message}`;
   }
 }
+
+/**
+ * Send an email through Microsoft Graph, using the same app-only credentials as OneDrive.
+ * Requires the APPLICATION permission Mail.Send (with admin consent) on the Azure app — the
+ * same app registration that already has Files.ReadWrite.All. Sends from GRAPH_MAIL_FROM,
+ * defaulting to the OneDrive mailbox (hr@bharatsteels.in).
+ */
+const MAIL_FROM = () => process.env.GRAPH_MAIL_FROM || process.env.GRAPH_DRIVE_USER;
+
+export async function sendMail({ to, subject, html, replyTo }) {
+  if (!graphConfigured()) return { sent: false, reason: 'Microsoft 365 is not configured.' };
+  const recipients = (Array.isArray(to) ? to : [to]).map((e) => (e || '').trim()).filter(Boolean);
+  if (!recipients.length) return { sent: false, reason: 'No recipient address.' };
+
+  const t = await token();
+  const res = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(MAIL_FROM())}/sendMail`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: {
+          subject,
+          body: { contentType: 'HTML', content: html },
+          toRecipients: recipients.map((e) => ({ emailAddress: { address: e } })),
+          ...(replyTo ? { replyTo: [{ emailAddress: { address: replyTo } }] } : {}),
+        },
+        saveToSentItems: true,
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    // 403 almost always means the Mail.Send application permission is missing or not consented.
+    const hint = res.status === 403 ? ' (grant Mail.Send application permission in Azure)' : '';
+    return { sent: false, reason: `Graph sendMail ${res.status}${hint}: ${txt.slice(0, 200)}` };
+  }
+  return { sent: true };
+}
