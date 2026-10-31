@@ -40,6 +40,21 @@ r.get('/openings', async (_req, res) => {
   res.json(rows);
 });
 
+/** One opening by id, for a shared deep link (/careers?job=<id>). Returns it whether or not it is
+ *  still open, so a link shared on a job portal always opens that exact role's application form. */
+r.get('/openings/:id', async (req, res) => {
+  const job = await one(
+    `SELECT j.id, j.title, j.department, j.location, j.employment_type,
+            j.min_experience, j.max_experience, j.description, j.status,
+            c.id AS company_id, c.code AS company_code, c.name AS company_name, c.colour
+       FROM jobs j JOIN companies c ON c.id = j.company_id
+      WHERE j.id = $1 AND c.active`,
+    [req.params.id]
+  );
+  if (!job) return res.status(404).json({ error: 'This opening is not available.' });
+  res.json(job);
+});
+
 /** Stage 1 — candidate applies from the careers page. */
 r.post('/apply', upload.single('resume'), async (req, res) => {
   try {

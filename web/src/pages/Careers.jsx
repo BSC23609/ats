@@ -11,34 +11,38 @@ export default function Careers() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
   const [params] = useSearchParams();
-  const [missing, setMissing] = useState(false); // a shared link points at a role that is no longer open
+  const [missing, setMissing] = useState(false); // a shared link points at a role that no longer exists
+  const deepLink = !!params.get('job');           // arrived via a per-role link shared on a job portal
 
   useEffect(() => {
-    api.get('/public/openings').then(setOpenings).catch((e) => setError(e.message));
-  }, []);
+    // The roles list is only needed for the normal careers page, not a single-role link.
+    if (!deepLink) api.get('/public/openings').then(setOpenings).catch((e) => setError(e.message));
+  }, [deepLink]);
 
-  // Arriving from a shared link like /careers?job=42 — open that role's form straight away.
+  // Arriving from a shared link like /careers?job=42 — fetch that exact role and show its form as
+  // a focused page. Fetched by id directly, so it works even if the role isn't in the open list.
   useEffect(() => {
     const wanted = params.get('job');
-    if (!wanted || !openings.length) return;
-    const match = openings.find((o) => String(o.id) === String(wanted));
-    if (match) openJob(match);
-    else setMissing(true);
-    // openings is set once, so this runs a single time after the roles load.
-  }, [openings]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!wanted) return;
+    api.get(`/public/openings/${wanted}`)
+      .then((o) => openJob(o))
+      .catch(() => setMissing(true));
+    // Runs once on arrival.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Escape closes the form, the way any dialog should.
+  // Escape closes the popup form on the normal careers page.
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && closeJob();
+    const onKey = (e) => e.key === 'Escape' && !deepLink && closeJob();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [deepLink]);
 
   const openJob = (o) => {
     setJob(o);
     setError('');
     setFile(null);
-    document.body.style.overflow = 'hidden'; // stop the page scrolling behind the dialog
+    // Only the popup needs the page behind it frozen; the dedicated link page scrolls normally.
+    if (!deepLink) document.body.style.overflow = 'hidden';
   };
 
   const closeJob = () => {
@@ -72,6 +76,102 @@ export default function Careers() {
     }
   };
 
+  // The application form fields, shared by the popup (list page) and the dedicated link page.
+  const formFields = (
+    <>
+      {job?.description && (
+        <div style={{ marginBottom: 20, paddingBottom: 18, borderBottom: '1px solid var(--line-soft)' }}>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>About the role</div>
+          {/* Written by an HR admin and stripped to a short tag allowlist on the server. */}
+          <div className="jd" dangerouslySetInnerHTML={{ __html: job.description }} />
+        </div>
+      )}
+
+      {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
+
+      <div className="field-row">
+        <div className="field">
+          <label htmlFor="full_name">Full name <span className="req">*</span></label>
+          <input id="full_name" name="full_name" required />
+        </div>
+        <div className="field">
+          <label htmlFor="email">Email <span className="req">*</span></label>
+          <input id="email" name="email" type="email" required />
+        </div>
+        <div className="field">
+          <label htmlFor="phone">Mobile number <span className="req">*</span></label>
+          <input id="phone" name="phone" required />
+        </div>
+      </div>
+
+      <div className="field-row">
+        <div className="field">
+          <label htmlFor="area">Area <span className="req">*</span></label>
+          <input id="area" name="area" required placeholder="Ambattur" />
+        </div>
+        <div className="field">
+          <label htmlFor="city">City / Town <span className="req">*</span></label>
+          <input id="city" name="city" required placeholder="Chennai" />
+        </div>
+        <div className="field">
+          <label htmlFor="pincode">PIN code <span className="req">*</span></label>
+          <input id="pincode" name="pincode" required
+                 inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
+                 title="Six digits"
+                 placeholder="600053" />
+        </div>
+      </div>
+
+      <div className="field-row">
+        <div className="field">
+          <label htmlFor="total_experience">Total experience (years)</label>
+          <input id="total_experience" name="total_experience" type="number" step="0.5" min="0" defaultValue="0" />
+        </div>
+        <div className="field">
+          <label htmlFor="notice_period_days">Notice period (days)</label>
+          <input id="notice_period_days" name="notice_period_days" type="number" min="0" />
+        </div>
+      </div>
+
+      <div className="field-row">
+        <div className="field">
+          <label htmlFor="current_ctc">Current annual salary (₹)</label>
+          <input id="current_ctc" name="current_ctc" type="number" min="0" />
+        </div>
+        <div className="field">
+          <label htmlFor="expected_ctc">Expected annual salary (₹)</label>
+          <input id="expected_ctc" name="expected_ctc" type="number" min="0" />
+        </div>
+      </div>
+
+      <div className="field">
+        <label htmlFor="resume">Resume — PDF or Word, up to 8 MB</label>
+        <input id="resume" type="file" accept=".pdf,.doc,.docx,.txt"
+               onChange={(e) => setFile(e.target.files[0] || null)} />
+        <p className="sub" style={{ marginTop: 6 }}>
+          Attach a resume and our team sees a structured overview of your background straight away.
+        </p>
+      </div>
+
+      <div className="note">
+        This is the short form. If you are called for an interview, you will get a link to the full application
+        form to complete on the day.
+      </div>
+    </>
+  );
+
+  // The role header (logo, title, location line) shown above the form.
+  const jobHeader = job && (
+    <div>
+      <CompanyLogo code={job.company_code} name={job.company_name} className="co-logo-sm" />
+      <h2 style={{ marginTop: 8 }}>{job.title}</h2>
+      <div className="sub">
+        {[job.department, job.location, experienceRange(job.min_experience, job.max_experience)]
+          .filter(Boolean).join(' · ')}
+      </div>
+    </div>
+  );
+
   if (done)
     return (
       <div className="public">
@@ -87,10 +187,41 @@ export default function Careers() {
           </p>
         </div>
         <p style={{ marginTop: 20 }}>
-          <button className="ghost" onClick={() => setDone(null)}>
-            Apply for another role
-          </button>
+          <a className="ghost" href="/careers" role="button"
+             style={{ display: 'inline-block', padding: '8px 14px' }}>
+            See all open roles
+          </a>
         </p>
+      </div>
+    );
+
+  // A per-role shared link: show only that role's application form, as its own page (no popup).
+  if (deepLink)
+    return (
+      <div className="public">
+        <div className="public-head">
+          <GroupLogo />
+          <div className="sub">Careers · Application</div>
+        </div>
+
+        {missing && (
+          <div className="note" style={{ marginBottom: 16 }}>
+            This role is no longer available. <a href="/careers">See all open roles →</a>
+          </div>
+        )}
+        {!job && !missing && <div className="empty">Loading the role…</div>}
+
+        {job && (
+          <form className="panel" onSubmit={submit} style={{ maxWidth: 760 }}>
+            <div className="panel-head">{jobHeader}</div>
+            <div className="panel-body">
+              {formFields}
+              <button type="submit" disabled={busy} style={{ marginTop: 6 }}>
+                {busy ? 'Sending…' : 'Send application'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     );
 
@@ -112,11 +243,6 @@ export default function Careers() {
       </p>
 
       <h2 style={{ marginBottom: 12 }}>Open roles</h2>
-      {missing && (
-        <div className="note" style={{ marginBottom: 16 }}>
-          That role has closed. Browse the other openings below.
-        </div>
-      )}
       {!openings.length && <div className="empty">No roles are open right now. Check back soon.</div>}
 
       {Object.entries(byCompany).map(([company, list]) => (
@@ -149,98 +275,12 @@ export default function Careers() {
           <form className="dialog" onSubmit={submit} role="dialog" aria-modal="true"
                 aria-label={`Apply for ${job.title}`}>
             <div className="dialog-head">
-              <div>
-                <CompanyLogo code={job.company_code} name={job.company_name} className="co-logo-sm" />
-                <h2 style={{ marginTop: 8 }}>{job.title}</h2>
-                <div className="sub">
-                  {[job.department, job.location, experienceRange(job.min_experience, job.max_experience)]
-                    .filter(Boolean).join(' · ')}
-                </div>
-              </div>
+              {jobHeader}
               <button type="button" className="dialog-close" onClick={closeJob} aria-label="Close">×</button>
             </div>
             <div className="dialog-body">
-              {job.description && (
-                <div style={{ marginBottom: 20, paddingBottom: 18, borderBottom: '1px solid var(--line-soft)' }}>
-                  <div className="eyebrow" style={{ marginBottom: 8 }}>About the role</div>
-                  {/* Written by an HR admin and stripped to a short tag allowlist on the server. */}
-                  <div className="jd" dangerouslySetInnerHTML={{ __html: job.description }} />
-                </div>
-              )}
-
-            {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
-
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="full_name">Full name <span className="req">*</span></label>
-                <input id="full_name" name="full_name" required />
-              </div>
-              <div className="field">
-                <label htmlFor="email">Email <span className="req">*</span></label>
-                <input id="email" name="email" type="email" required />
-              </div>
-              <div className="field">
-                <label htmlFor="phone">Mobile number <span className="req">*</span></label>
-                <input id="phone" name="phone" required />
-              </div>
+              {formFields}
             </div>
-
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="area">Area <span className="req">*</span></label>
-                <input id="area" name="area" required placeholder="Ambattur" />
-              </div>
-              <div className="field">
-                <label htmlFor="city">City / Town <span className="req">*</span></label>
-                <input id="city" name="city" required placeholder="Chennai" />
-              </div>
-              <div className="field">
-                <label htmlFor="pincode">PIN code <span className="req">*</span></label>
-                <input id="pincode" name="pincode" required
-                       inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
-                       title="Six digits"
-                       placeholder="600053" />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="total_experience">Total experience (years)</label>
-                <input id="total_experience" name="total_experience" type="number" step="0.5" min="0" defaultValue="0" />
-              </div>
-              <div className="field">
-                <label htmlFor="notice_period_days">Notice period (days)</label>
-                <input id="notice_period_days" name="notice_period_days" type="number" min="0" />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="current_ctc">Current annual salary (₹)</label>
-                <input id="current_ctc" name="current_ctc" type="number" min="0" />
-              </div>
-              <div className="field">
-                <label htmlFor="expected_ctc">Expected annual salary (₹)</label>
-                <input id="expected_ctc" name="expected_ctc" type="number" min="0" />
-              </div>
-            </div>
-
-            <div className="field">
-              <label htmlFor="resume">Resume — PDF or Word, up to 8 MB</label>
-              <input id="resume" type="file" accept=".pdf,.doc,.docx,.txt"
-                     onChange={(e) => setFile(e.target.files[0] || null)} />
-              <p className="sub" style={{ marginTop: 6 }}>
-                Attach a resume and our team sees a structured overview of your background straight away.
-              </p>
-            </div>
-
-            <div className="note">
-              This is the short form. If you are called for an interview, you will get a link to the full application
-              form to complete on the day.
-            </div>
-
-            </div>
-
             <div className="dialog-foot">
               <button type="button" className="ghost" onClick={closeJob}>Cancel</button>
               <button type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send application'}</button>
