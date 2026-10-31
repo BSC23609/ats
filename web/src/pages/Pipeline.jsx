@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, useAuth, PIPELINE, CLOSED, STATUS_LABEL, money, date, scoreBand } from '../api.jsx';
 import ResumeViewer from '../components/ResumeViewer.jsx';
 
 export default function Pipeline() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [sp, setSp] = useSearchParams();
+  const jobFilter = sp.get('job') || ''; // set when arriving from an Openings applicant-count click
 
   // Whoever looks after more than one company gets a picker — super admin or HR admin alike.
   const companies = user.companies || [];
@@ -27,6 +29,7 @@ export default function Pipeline() {
     if (company) qs.set('company', company);
     if (status) qs.set('status', status);
     if (search) qs.set('q', search);
+    if (jobFilter) qs.set('job', jobFilter);
     if (sort === 'score') qs.set('sort', 'score');
 
     return Promise.all([
@@ -37,7 +40,11 @@ export default function Pipeline() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [company, status, search, sort, scope]);
+  useEffect(() => { load(); }, [company, status, search, sort, scope, jobFilter]);
+
+  // When filtered to one role (from the Openings count), name it so the view is self-explanatory.
+  const jobRole = jobFilter ? (rows[0]?.job_title || rows[0]?.position_applied || 'this role') : '';
+  const clearJob = () => { const n = new URLSearchParams(sp); n.delete('job'); setSp(n); };
 
   // Re-read and re-score a resume whose extraction or scoring failed.
   const retryScore = async (id) => {
@@ -95,6 +102,13 @@ export default function Pipeline() {
                  onChange={(e) => setSearch(e.target.value)} style={{ width: 220 }} />
         </div>
       </div>
+
+      {jobFilter && (
+        <div className="note" style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span>Showing applicants for <strong>{jobRole}</strong>.</span>
+          <button className="ghost small" onClick={clearJob}>Show all candidates</button>
+        </div>
+      )}
 
       {/* Signature: the welded track. Each segment is a stage; click to filter. */}
       <div className="track" style={{ marginBottom: 8 }}>

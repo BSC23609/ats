@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, useAuth, date, experienceRange } from '../api.jsx';
 import RichText from '../components/RichText.jsx';
 
 export default function Jobs() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const companies = user.companies || [];
   const [rows, setRows] = useState([]);
   const multiCompany = companies.length > 1;
@@ -477,7 +479,18 @@ export default function Jobs() {
                       ? <span className="chip JOINED">On file</span>
                       : <span className="chip ON_HOLD">Not uploaded</span>}
                   </td>
-                  <td><strong>{j.applicant_count}</strong></td>
+                  <td>
+                    {j.applicant_count > 0 ? (
+                      <button onClick={() => navigate(`/pipeline?job=${j.id}`)}
+                              title="View everyone who applied for this role and their resumes"
+                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                                       color: '#0064a0', textDecoration: 'underline', font: 'inherit' }}>
+                        <strong>{j.applicant_count}</strong>
+                      </button>
+                    ) : (
+                      <strong>0</strong>
+                    )}
+                  </td>
                   <td><span className={`chip ${j.status === 'OPEN' ? 'JOINED' : j.status === 'CLOSED' ? 'REJECTED' : 'ON_HOLD'}`}>{j.status}</span></td>
                   <td className="sub">{date(j.created_at)}</td>
                   <td>
