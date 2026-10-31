@@ -22,6 +22,27 @@ export default function Jobs() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [copiedId, setCopiedId] = useState(null); // which opening's link was just copied
+
+  // Build and copy the public careers link that opens this role's application form directly.
+  const copyLink = async (j) => {
+    const url = `${window.location.origin}/careers?job=${j.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Clipboard API can be blocked; fall back to a hidden textarea.
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    setCopiedId(j.id);
+    setTimeout(() => setCopiedId((c) => (c === j.id ? null : c)), 1600);
+  };
 
   const load = () => api.get('/jobs').then(setRows).catch((e) => setError(e.message));
 
@@ -459,6 +480,10 @@ export default function Jobs() {
                   <td className="sub">{date(j.created_at)}</td>
                   <td>
                     <div className="row">
+                      <button className="ghost small" onClick={() => copyLink(j)}
+                              title="Copy the public link that opens this role's application form">
+                        {copiedId === j.id ? 'Copied!' : 'Copy link'}
+                      </button>
                       <button className="ghost small" onClick={() => openEdit(j)}>Edit</button>
                       <button className="ghost small" onClick={() => { setJd(j); setJdText(''); setJdFile(null); setMsg(''); }}>
                         {j.has_jd ? 'Replace JD' : 'Upload JD'}

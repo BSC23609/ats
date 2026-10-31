@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, experienceRange } from '../api.jsx';
 import { GroupLogo, CompanyLogo } from '../components/Logo.jsx';
 
@@ -9,10 +10,22 @@ export default function Careers() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
+  const [params] = useSearchParams();
+  const [missing, setMissing] = useState(false); // a shared link points at a role that is no longer open
 
   useEffect(() => {
     api.get('/public/openings').then(setOpenings).catch((e) => setError(e.message));
   }, []);
+
+  // Arriving from a shared link like /careers?job=42 — open that role's form straight away.
+  useEffect(() => {
+    const wanted = params.get('job');
+    if (!wanted || !openings.length) return;
+    const match = openings.find((o) => String(o.id) === String(wanted));
+    if (match) openJob(match);
+    else setMissing(true);
+    // openings is set once, so this runs a single time after the roles load.
+  }, [openings]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Escape closes the form, the way any dialog should.
   useEffect(() => {
@@ -99,6 +112,11 @@ export default function Careers() {
       </p>
 
       <h2 style={{ marginBottom: 12 }}>Open roles</h2>
+      {missing && (
+        <div className="note" style={{ marginBottom: 16 }}>
+          That role has closed. Browse the other openings below.
+        </div>
+      )}
       {!openings.length && <div className="empty">No roles are open right now. Check back soon.</div>}
 
       {Object.entries(byCompany).map(([company, list]) => (
