@@ -24,9 +24,11 @@ export default function Jobs() {
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null); // which opening's link was just copied
 
-  // Build and copy the public careers link that opens this role's application form directly.
+  // Open the role's application form in a new tab AND copy its link (to paste on job portals).
   const copyLink = async (j) => {
     const url = `${window.location.origin}/careers?job=${j.id}`;
+    // Opened synchronously, inside the click, so the browser doesn't treat it as a blocked popup.
+    window.open(url, '_blank', 'noopener');
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -481,8 +483,8 @@ export default function Jobs() {
                   <td>
                     <div className="row">
                       <button className="ghost small" onClick={() => copyLink(j)}
-                              title="Copy the public link that opens this role's application form">
-                        {copiedId === j.id ? 'Copied!' : 'Copy link'}
+                              title="Open this role's application form in a new tab and copy its link to share on job portals">
+                        {copiedId === j.id ? 'Opened · link copied' : 'Copy link'}
                       </button>
                       <button className="ghost small" onClick={() => openEdit(j)}>Edit</button>
                       <button className="ghost small" onClick={() => { setJd(j); setJdText(''); setJdFile(null); setMsg(''); }}>
