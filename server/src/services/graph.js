@@ -137,9 +137,14 @@ export async function checkGraph() {
 const MAIL_FROM = () => process.env.GRAPH_MAIL_FROM || process.env.GRAPH_DRIVE_USER;
 
 export async function sendMail({ to, subject, html, replyTo, attachments }) {
-  if (!graphConfigured()) return { sent: false, reason: 'Microsoft 365 is not configured.' };
   const recipients = (Array.isArray(to) ? to : [to]).map((e) => (e || '').trim()).filter(Boolean);
   if (!recipients.length) return { sent: false, reason: 'No recipient address.' };
+
+  // Prefer Brevo when its key is set — a plain web API that needs no Exchange app-access policy.
+  if (process.env.BREVO_API_KEY)
+    return sendViaBrevo({ recipients, subject, html, replyTo, attachments });
+
+  if (!graphConfigured()) return { sent: false, reason: 'Microsoft 365 is not configured.' };
 
   // Files to attach, each { name, contentType, contentBytes(base64) }. Graph takes them inline on
   // sendMail while the whole request stays small (a few MB), which covers any normal resume.
@@ -179,4 +184,43 @@ export async function sendMail({ to, subject, html, replyTo, attachments }) {
     return { sent: false, reason: `Graph sendMail ${res.status}${hint}: ${txt.slice(0, 200)}` };
   }
   return { sent: true };
+}
+
+/**
+ * Send through Brevo's transactional-email API (https://api.brevo.com/v3/smtp/email).
+ * Needs only BREVO_API_KEY and a verified sender — no Azure app, no Exchange application access
+ * policy. The from-address is BREVO_FROM, falling back to the same hr@ mailbox used elsewhere;
+ * it must be verified in Brevo (Senders & IP) or the send is rejected.
+ */
+async function sendViaBrevo({ recipients, subject, html, replyTo, attachments }) {
+  const from = process.env.BREVO_FROM || MAIL_FROM();
+  const atts = (attachments || [])
+    .filter((a) => a && a.contentBytes)
+    .map((a) => ({ name: a.name || 'attachment', content: a.contentBytes }));
+
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { email: from, name: process.env.BREVO_FROM_NAME || 'Bharat Steel Group Recruitment' },
+        to: recipients.map((e) => ({ email: e })),
+        subject,
+        htmlContent: html,
+        ...(replyTo ? { replyTo: { email: replyTo } } : {}),
+        ...(atts.length ? { attachment: atts } : {}),
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      return { sent: false, reason: `Brevo ${res.status}: ${txt.slice(0, 200)}` };
+    }
+    return { sent: true };
+  } catch (err) {
+    return { sent: false, reason: `Brevo request failed: ${err.message}` };
+  }
 }
