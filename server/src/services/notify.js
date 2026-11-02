@@ -1,5 +1,17 @@
 import { one, q } from '../db.js';
 import { sendMail, graphConfigured } from './graph.js';
+import { getFile } from './storage.js';
+
+const MIME = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.txt': 'text/plain',
+};
+const mimeFor = (name) => {
+  const ext = (name || '').toLowerCase().match(/\.[a-z0-9]+$/);
+  return (ext && MIME[ext[0]]) || 'application/octet-stream';
+};
 
 const money = (n) => (n == null || n === '' ? '—' : '₹' + Number(n).toLocaleString('en-IN'));
 const esc = (s) =>
@@ -54,6 +66,28 @@ export async function notifyHrOfApplication(appId) {
       [app.area, app.city, app.pincode].map((x) => (x || '').trim()).filter(Boolean).join(', ') ||
       app.current_location || '—';
 
+    // Attach the resume itself so HR reads it straight from the email. Graph takes the file inline on
+    // sendMail while the request stays small; skip anything large so a big file never blocks the alert.
+    let attachments;
+    let resumeNote = app.resume_filename ? 'Attached in the portal' : 'Not attached';
+    if (app.resume_path) {
+      try {
+        const buf = await getFile(app.resume_path);
+        if (buf && buf.length <= 3 * 1024 * 1024) {
+          attachments = [{
+            name: app.resume_filename || `${app.ref_code} resume`,
+            contentType: mimeFor(app.resume_filename),
+            contentBytes: buf.toString('base64'),
+          }];
+          resumeNote = 'Attached to this email';
+        } else if (buf) {
+          resumeNote = 'In the portal (too large to attach)';
+        }
+      } catch (e) {
+        console.error('resume attach failed:', e.message); // fall back to the portal link
+      }
+    }
+
     const row = (label, value) =>
       `<tr><td style="padding:6px 14px 6px 0;color:#697178;white-space:nowrap">${label}</td>` +
       `<td style="padding:6px 0;color:#101519;font-weight:500">${value}</td></tr>`;
@@ -76,7 +110,7 @@ export async function notifyHrOfApplication(appId) {
           ${row('Experience', app.total_experience != null ? esc(app.total_experience) + ' yrs' : '—')}
           ${row('Expected salary', money(app.expected_ctc))}
           ${row('Notice period', app.notice_period_days != null ? esc(app.notice_period_days) + ' days' : '—')}
-          ${row('Resume', app.resume_filename ? 'Attached in the portal' : 'Not attached')}
+          ${row('Resume', resumeNote)}
         </table>
         ${link
           ? `<p style="margin:0 0 20px">
@@ -97,12 +131,78 @@ export async function notifyHrOfApplication(appId) {
       subject: `New application — ${app.full_name} for ${app.position_applied} (${app.company_code})`,
       html,
       replyTo: app.email, // so HR can reply straight to the candidate
+      attachments,         // the resume file, when it is small enough to go inline
     });
 
     await mark(result.sent ? 'SENT' : 'FAILED', result.sent ? null : result.reason);
     return result;
   } catch (err) {
     await mark('FAILED', err.message);
+    return { sent: false, reason: err.message };
+  }
+}
+
+/**
+ * Email the candidate their full-application-form link when HR moves them to Interview.
+ * Sent to the candidate (app.email), from GRAPH_MAIL_FROM, with reply-to set to the HR mailbox
+ * so the candidate can reply to a real person. Returns { sent, reason } — it never throws.
+ */
+export async function emailInterviewForm(appId) {
+  try {
+    const app = await one(
+      `SELECT a.*, c.code AS company_code, c.name AS company_name
+         FROM applications a JOIN companies c ON c.id = a.company_id
+        WHERE a.id = $1`,
+      [appId]
+    );
+    if (!app) return { sent: false, reason: 'Application not found.' };
+    if (!app.email) return { sent: false, reason: 'Candidate has no email on file.' };
+    if (!graphConfigured()) return { sent: false, reason: 'Email not configured.' };
+
+    const base = (process.env.PUBLIC_WEB_URL || '').replace(/\/+$/, '');
+    if (!base) return { sent: false, reason: 'PUBLIC_WEB_URL is not set.' };
+    const link = `${base}/form/${app.stage2_token}`;
+
+    const hrReply = process.env.GRAPH_MAIL_FROM || process.env.GRAPH_DRIVE_USER || 'hr@bharatsteels.in';
+    const when = app.interview_at
+      ? new Date(app.interview_at).toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })
+      : null;
+
+    const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#101519">
+        <p>Dear ${esc(app.full_name)},</p>
+        <p>
+          Thank you for applying for <strong>${esc(app.position_applied)}</strong> at
+          ${esc(app.company_name)}. We would like to take your application forward to the interview stage.
+        </p>
+        ${when ? `<p><strong>Interview:</strong> ${esc(when)}</p>` : ''}
+        <p>
+          Please complete your full application form using the secure link below before your interview.
+          It only takes a few minutes.
+        </p>
+        <p style="margin:22px 0">
+          <a href="${link}" style="background:#0064a0;color:#fff;text-decoration:none;
+             padding:12px 22px;border-radius:4px;font-weight:600;display:inline-block">
+            Complete your application form
+          </a>
+        </p>
+        <p style="color:#697178;font-size:13px">
+          Or paste this link into your browser:<br>
+          <a href="${link}">${link}</a>
+        </p>
+        <p style="color:#697178;font-size:13px;margin-top:20px">
+          Reference: ${esc(app.ref_code)}. If you have any questions, simply reply to this email.
+        </p>
+        <p>Warm regards,<br>Recruitment Team, ${esc(app.company_name)}</p>
+      </div>`;
+
+    return await sendMail({
+      to: app.email,
+      subject: `Interview — complete your application form (${app.company_code} · ${app.ref_code})`,
+      html,
+      replyTo: hrReply,
+    });
+  } catch (err) {
     return { sent: false, reason: err.message };
   }
 }
