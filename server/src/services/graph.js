@@ -136,10 +136,21 @@ export async function checkGraph() {
  */
 const MAIL_FROM = () => process.env.GRAPH_MAIL_FROM || process.env.GRAPH_DRIVE_USER;
 
-export async function sendMail({ to, subject, html, replyTo }) {
+export async function sendMail({ to, subject, html, replyTo, attachments }) {
   if (!graphConfigured()) return { sent: false, reason: 'Microsoft 365 is not configured.' };
   const recipients = (Array.isArray(to) ? to : [to]).map((e) => (e || '').trim()).filter(Boolean);
   if (!recipients.length) return { sent: false, reason: 'No recipient address.' };
+
+  // Files to attach, each { name, contentType, contentBytes(base64) }. Graph takes them inline on
+  // sendMail while the whole request stays small (a few MB), which covers any normal resume.
+  const atts = (attachments || [])
+    .filter((a) => a && a.contentBytes)
+    .map((a) => ({
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: a.name || 'attachment',
+      contentType: a.contentType || 'application/octet-stream',
+      contentBytes: a.contentBytes,
+    }));
 
   const t = await token();
   const res = await fetch(
@@ -153,6 +164,7 @@ export async function sendMail({ to, subject, html, replyTo }) {
           body: { contentType: 'HTML', content: html },
           toRecipients: recipients.map((e) => ({ emailAddress: { address: e } })),
           ...(replyTo ? { replyTo: [{ emailAddress: { address: replyTo } }] } : {}),
+          ...(atts.length ? { attachments: atts } : {}),
         },
         saveToSentItems: true,
       }),
@@ -161,8 +173,9 @@ export async function sendMail({ to, subject, html, replyTo }) {
 
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
-    // 403 almost always means the Mail.Send application permission is missing or not consented.
-    const hint = res.status === 403 ? ' (grant Mail.Send application permission in Azure)' : '';
+    // Surface the exact from-address, so an access-policy block makes it obvious which mailbox the
+    // app is sending as (it must be one the Exchange application access policy allows).
+    const hint = res.status === 403 ? ` (sending as ${MAIL_FROM()})` : '';
     return { sent: false, reason: `Graph sendMail ${res.status}${hint}: ${txt.slice(0, 200)}` };
   }
   return { sent: true };
