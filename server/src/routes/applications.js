@@ -7,7 +7,7 @@ import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
 import { syncWorkbook } from '../services/workbook.js';
-import { notifyHrOfApplication } from '../services/notify.js';
+import { notifyHrOfApplication, emailInterviewForm } from '../services/notify.js';
 
 const r = Router();
 r.use(requireAuth);
@@ -249,6 +249,15 @@ r.post('/:id/status', async (req, res) => {
 
   res.json({ ok: true, employee: result });
 
+  // Moving a candidate to Interview emails THEM their full-application-form link, with the
+  // interview date HR just set. Fire-and-forget — a slow mail send must not fail the HR click,
+  // and a bad candidate address is logged, not surfaced.
+  if (status === 'INTERVIEW') {
+    emailInterviewForm(app.id)
+      .then((out) => { if (!out.sent) console.error('interview email not sent:', out.reason); })
+      .catch((e) => console.error('interview email error:', e.message));
+  }
+
   // A new employee record means the master workbook is out of date. Fire-and-forget:
   // OneDrive being slow must not make the HR admin's click fail.
   if (status === 'JOINED') syncWorkbook();
@@ -277,7 +286,9 @@ r.post('/:id/offer-letter', offerUpload.single('offer_letter'), async (req, res,
     let key = app.offer_letter_path;
     if (req.file) {
       const co = await one('SELECT code FROM companies WHERE id=$1', [app.company_id]);
-      key = `Offer Letters/${co.code}/${safeName(`${app.ref_code} - ${app.full_name}`)}.pdf`;
+      // Same candidate folder as the resume:  {COMPANY}/{Role}/{Name}_{AppID}/offer-letter.pdf
+      const folder = `${co.code}/${safeName(app.position_applied)}/${safeName(app.full_name)}_${app.id}`;
+      key = `${folder}/offer-letter.pdf`;
       await putFile(key, req.file.buffer, 'application/pdf');
     }
 
