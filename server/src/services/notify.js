@@ -132,6 +132,9 @@ export async function notifyHrOfApplication(appId) {
       html,
       replyTo: app.email, // so HR can reply straight to the candidate
       attachments,         // the resume file, when it is small enough to go inline
+      // Send the HR alert from the alerts mailbox (ai@ "BSG Alerts") when NOTIFY_FROM is set.
+      // Candidate-facing emails are unaffected — they keep using GRAPH_MAIL_FROM (hr@).
+      from: process.env.NOTIFY_FROM || undefined,
     });
 
     await mark(result.sent ? 'SENT' : 'FAILED', result.sent ? null : result.reason);

@@ -136,13 +136,17 @@ export async function checkGraph() {
  */
 const MAIL_FROM = () => process.env.GRAPH_MAIL_FROM || process.env.GRAPH_DRIVE_USER;
 
-export async function sendMail({ to, subject, html, replyTo, attachments }) {
+export async function sendMail({ to, subject, html, replyTo, attachments, from }) {
   const recipients = (Array.isArray(to) ? to : [to]).map((e) => (e || '').trim()).filter(Boolean);
   if (!recipients.length) return { sent: false, reason: 'No recipient address.' };
 
+  // The mailbox this particular email is sent FROM. Callers can override per-email (e.g. HR alerts
+  // from ai@ "BSG Alerts", candidate mail from hr@); otherwise it falls back to GRAPH_MAIL_FROM.
+  const sender = (from && from.trim()) || MAIL_FROM();
+
   // Prefer Brevo when its key is set — a plain web API that needs no Exchange app-access policy.
   if (process.env.BREVO_API_KEY)
-    return sendViaBrevo({ recipients, subject, html, replyTo, attachments });
+    return sendViaBrevo({ recipients, subject, html, replyTo, attachments, from: sender });
 
   if (!graphConfigured()) return { sent: false, reason: 'Microsoft 365 is not configured.' };
 
@@ -159,7 +163,7 @@ export async function sendMail({ to, subject, html, replyTo, attachments }) {
 
   const t = await token();
   const res = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(MAIL_FROM())}/sendMail`,
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(sender)}/sendMail`,
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
@@ -180,7 +184,7 @@ export async function sendMail({ to, subject, html, replyTo, attachments }) {
     const txt = await res.text().catch(() => '');
     // Surface the exact from-address, so an access-policy block makes it obvious which mailbox the
     // app is sending as (it must be one the Exchange application access policy allows).
-    const hint = res.status === 403 ? ` (sending as ${MAIL_FROM()})` : '';
+    const hint = res.status === 403 ? ` (sending as ${sender})` : '';
     return { sent: false, reason: `Graph sendMail ${res.status}${hint}: ${txt.slice(0, 200)}` };
   }
   return { sent: true };
@@ -192,8 +196,8 @@ export async function sendMail({ to, subject, html, replyTo, attachments }) {
  * policy. The from-address is BREVO_FROM, falling back to the same hr@ mailbox used elsewhere;
  * it must be verified in Brevo (Senders & IP) or the send is rejected.
  */
-async function sendViaBrevo({ recipients, subject, html, replyTo, attachments }) {
-  const from = process.env.BREVO_FROM || MAIL_FROM();
+async function sendViaBrevo({ recipients, subject, html, replyTo, attachments, from }) {
+  const sender = (from && from.trim()) || process.env.BREVO_FROM || MAIL_FROM();
   const atts = (attachments || [])
     .filter((a) => a && a.contentBytes)
     .map((a) => ({ name: a.name || 'attachment', content: a.contentBytes }));
@@ -207,7 +211,7 @@ async function sendViaBrevo({ recipients, subject, html, replyTo, attachments })
         accept: 'application/json',
       },
       body: JSON.stringify({
-        sender: { email: from, name: process.env.BREVO_FROM_NAME || 'Bharat Steel Group Recruitment' },
+        sender: { email: sender, name: process.env.BREVO_FROM_NAME || 'Bharat Steel Group Recruitment' },
         to: recipients.map((e) => ({ email: e })),
         subject,
         htmlContent: html,
