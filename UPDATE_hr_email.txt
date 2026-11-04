@@ -1,0 +1,39 @@
+UPDATE — HR email notification on new application
+=================================================
+
+WHAT THIS ADDS
+When a candidate submits the public apply form, the ATS automatically emails
+HR (hr@bharatsteels.in) with the candidate's name, position, company, source,
+contact details and a button to open them in the ATS. Sent via the same
+Microsoft Graph app you already use for OneDrive. It runs in the background, so
+a mail hiccup never blocks the candidate's submission.
+
+FILES IN THIS ZIP  (drop into C:\Projects\ats, overwriting the old ones)
+  notify.py        <- NEW file (the email sender)
+  main.py          <- overwrite (now fires the HR email on apply)
+  config.py        <- overwrite (adds HR_NOTIFY_EMAIL + GRAPH_SENDER settings)
+  .env.example     <- overwrite (documents the two new settings)
+
+STEP 1 — Azure: add the Mail.Send permission (one time)
+  portal.azure.com -> Entra ID -> App registrations -> your ATS app
+  -> API permissions -> Add a permission -> Microsoft Graph
+  -> Application permissions -> search "Mail" -> tick  Mail.Send  -> Add
+  -> click  "Grant admin consent"  (row must show the green tick)
+  (This is on top of Files.ReadWrite.All you already granted.)
+
+STEP 2 — Render: add two environment variables
+  HR_NOTIFY_EMAIL = hr@bharatsteels.in      (comma-separate for more people)
+  GRAPH_SENDER    = hr@bharatsteels.in      (the mailbox it is sent FROM)
+  (GRAPH_SENDER must be a real licensed M365 mailbox in your tenant.)
+
+STEP 3 — push
+  Copy the 4 files in, then:   push.bat add HR email on new application
+
+VERIFY
+  Open  https://group-ats.onrender.com/healthz
+  It should now read:  {"ok":true,"graph":true,"hr_notify":true}
+  Then submit a test application at /apply/BSC and check hr@bharatsteels.in.
+
+NOTE
+  Until STEP 1 + STEP 2 are done, hr_notify shows false and no mail is sent —
+  the app still works normally, it just skips the email.
