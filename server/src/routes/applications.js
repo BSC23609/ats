@@ -174,6 +174,25 @@ r.post('/:id/notify', async (req, res, next) => {
   }
 });
 
+/** Clear the HR-email send log for one application (the Sent/Failed status in the pipeline's
+    HR EMAIL column). Resets the notify_* fields so the column shows "Not sent" again; it does
+    NOT send or delete anything else — the candidate and all other data stay untouched. */
+r.delete('/:id/notify', async (req, res, next) => {
+  try {
+    const app = await one('SELECT company_id FROM applications WHERE id=$1', [req.params.id]);
+    if (!app) return res.status(404).json({ error: 'Application not found.' });
+    if (!assertCompanyAccess(req, res, app.company_id)) return;
+
+    await q(
+      `UPDATE applications SET notify_status=NULL, notify_at=NULL, notify_error=NULL WHERE id=$1`,
+      [req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** Move a candidate along the pipeline. JOINED creates the employee record. */
 r.post('/:id/status', async (req, res) => {
   const { status, note, interview_at, offered_ctc, emp_code, date_of_joining, designation, department } = req.body;

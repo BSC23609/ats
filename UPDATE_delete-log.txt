@@ -1,0 +1,28 @@
+UPDATE — "Delete log" option in the HR EMAIL column
+===================================================
+
+WHAT THIS ADDS
+In the Candidate pipeline, the HR EMAIL column now has a "Delete log" button
+next to the send status:
+  - When a row shows "Sent"   -> a "Delete log" button appears under it.
+  - When a row shows "Failed" -> "Resend" and "Delete log" both appear.
+Clicking "Delete log" clears that candidate's HR-email send status, so the
+column goes back to "Not sent" (with its Send button). It asks for confirmation
+first.
+
+IMPORTANT — this only clears the EMAIL LOG (the Sent/Failed marker). It does NOT
+delete the candidate, the application, the resume, or anything else. Everything
+else stays exactly as it is.
+
+FILES IN THIS ZIP  (keep the folder paths; overwrite)
+  server/src/routes/applications.js   <- adds DELETE /applications/:id/notify
+  web/src/pages/Pipeline.jsx          <- adds the "Delete log" button + handler
+
+DEPLOY
+  Same as before: put the two files in place (overwriting), commit + push so
+  Vercel (frontend) and Render (bsg-ats-api backend) both redeploy. The button
+  needs BOTH deployed — the frontend calls the new backend route.
+
+VERIFY
+  Open the pipeline -> on a Sent or Failed row, click "Delete log" -> confirm ->
+  the HR EMAIL cell resets to "Not sent".

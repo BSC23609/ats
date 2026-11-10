@@ -70,6 +70,21 @@ export default function Pipeline() {
     }
   };
 
+  // Clear the HR-email send log (resets the Sent/Failed status to "Not sent"). Does not send
+  // or delete anything else.
+  const clearNotifyLog = async (id) => {
+    if (!window.confirm('Clear the HR email log for this candidate? This only resets the send status.')) return;
+    setNotifying(id);
+    try {
+      await api.del(`/applications/${id}/notify`);
+      await load();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setNotifying(null);
+    }
+  };
+
   const counts = useMemo(() => {
     const map = {};
     stats.forEach((r) => { map[r.status] = (map[r.status] || 0) + r.n; });
@@ -217,9 +232,16 @@ export default function Pipeline() {
                   <td className="sub">{date(a.created_at)}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     {a.notify_status === 'SENT' ? (
-                      <span className="chip JOINED" title={a.notify_at ? `Sent ${date(a.notify_at)}` : 'Sent'}>
-                        Sent
-                      </span>
+                      <div>
+                        <span className="chip JOINED" title={a.notify_at ? `Sent ${date(a.notify_at)}` : 'Sent'}>
+                          Sent
+                        </span>
+                        <button className="ghost small" style={{ marginTop: 5, display: 'block' }}
+                                disabled={notifying === a.id}
+                                onClick={() => clearNotifyLog(a.id)}>
+                          Delete log
+                        </button>
+                      </div>
                     ) : a.notify_status === 'FAILED' ? (
                       <div>
                         <span className="chip REJECTED" title={a.notify_error || 'Send failed'}>Failed</span>
@@ -227,6 +249,11 @@ export default function Pipeline() {
                                 disabled={notifying === a.id}
                                 onClick={() => resendNotify(a.id)}>
                           {notifying === a.id ? 'Sending…' : 'Resend'}
+                        </button>
+                        <button className="ghost small" style={{ marginTop: 5, display: 'block' }}
+                                disabled={notifying === a.id}
+                                onClick={() => clearNotifyLog(a.id)}>
+                          Delete log
                         </button>
                       </div>
                     ) : (
