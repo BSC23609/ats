@@ -174,19 +174,23 @@ r.post('/:id/notify', async (req, res, next) => {
   }
 });
 
-/** Clear the HR-email send log for one application (the Sent/Failed status in the pipeline's
-    HR EMAIL column). Resets the notify_* fields so the column shows "Not sent" again; it does
-    NOT send or delete anything else — the candidate and all other data stay untouched. */
-r.delete('/:id/notify', async (req, res, next) => {
+/** Delete one application row from the pipeline, permanently.
+    status_history rows cascade-delete automatically. If the candidate was already made an
+    employee (status Joined), that employee record is KEPT but detached from this application
+    (its application_id is cleared), so the delete can't fail on that link and no staff record
+    is lost. Any resume / offer-letter files in OneDrive are left in place. */
+r.delete('/:id', async (req, res, next) => {
   try {
     const app = await one('SELECT company_id FROM applications WHERE id=$1', [req.params.id]);
     if (!app) return res.status(404).json({ error: 'Application not found.' });
     if (!assertCompanyAccess(req, res, app.company_id)) return;
 
-    await q(
-      `UPDATE applications SET notify_status=NULL, notify_at=NULL, notify_error=NULL WHERE id=$1`,
-      [req.params.id]
-    );
+    await tx(async (client) => {
+      // Detach any employee record so the foreign key doesn't block the delete.
+      await client.query('UPDATE employees SET application_id=NULL WHERE application_id=$1', [req.params.id]);
+      // status_history cascades on delete; this removes the application row itself.
+      await client.query('DELETE FROM applications WHERE id=$1', [req.params.id]);
+    });
     res.json({ ok: true });
   } catch (err) {
     next(err);

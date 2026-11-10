@@ -1,28 +1,32 @@
-UPDATE — "Delete log" option in the HR EMAIL column
-===================================================
+UPDATE — "Delete log" removes the whole candidate row
+=====================================================
 
-WHAT THIS ADDS
-In the Candidate pipeline, the HR EMAIL column now has a "Delete log" button
-next to the send status:
-  - When a row shows "Sent"   -> a "Delete log" button appears under it.
-  - When a row shows "Failed" -> "Resend" and "Delete log" both appear.
-Clicking "Delete log" clears that candidate's HR-email send status, so the
-column goes back to "Not sent" (with its Send button). It asks for confirmation
-first.
+WHAT THIS DOES
+The "Delete log" button in the HR EMAIL column now DELETES THE WHOLE ROW
+(the candidate / application), not just the email status.
 
-IMPORTANT — this only clears the EMAIL LOG (the Sent/Failed marker). It does NOT
-delete the candidate, the application, the resume, or anything else. Everything
-else stays exactly as it is.
+  - Click "Delete log" on any row -> a confirmation pops up naming the
+    candidate (e.g. "Delete suba (BSC-2611-0232) permanently?").
+  - Confirm -> the application and its status history are permanently removed
+    and the row disappears from the pipeline.
+
+Safeguards built in:
+  - It asks for confirmation first, showing the candidate's name + reference,
+    so a row can't be deleted by a stray click.
+  - If the candidate had already been made an employee (status Joined), the
+    EMPLOYEE record is KEPT (just unlinked) — you don't lose a staff record.
+  - Resume / offer-letter files already in OneDrive are left in place.
+
+** This is permanent — deleted applications cannot be recovered from the app. **
 
 FILES IN THIS ZIP  (keep the folder paths; overwrite)
-  server/src/routes/applications.js   <- adds DELETE /applications/:id/notify
-  web/src/pages/Pipeline.jsx          <- adds the "Delete log" button + handler
+  server/src/routes/applications.js   <- adds DELETE /applications/:id
+  web/src/pages/Pipeline.jsx          <- "Delete log" button now deletes the row
 
 DEPLOY
-  Same as before: put the two files in place (overwriting), commit + push so
-  Vercel (frontend) and Render (bsg-ats-api backend) both redeploy. The button
-  needs BOTH deployed — the frontend calls the new backend route.
+  Put both files in place (overwriting), commit + push so Vercel (frontend) and
+  Render (bsg-ats-api backend) both redeploy. The button needs BOTH deployed.
 
 VERIFY
-  Open the pipeline -> on a Sent or Failed row, click "Delete log" -> confirm ->
-  the HR EMAIL cell resets to "Not sent".
+  Open the pipeline -> click "Delete log" on a test row -> confirm ->
+  the row is gone. Refresh to confirm it stays gone.

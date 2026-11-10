@@ -70,13 +70,15 @@ export default function Pipeline() {
     }
   };
 
-  // Clear the HR-email send log (resets the Sent/Failed status to "Not sent"). Does not send
-  // or delete anything else.
-  const clearNotifyLog = async (id) => {
-    if (!window.confirm('Clear the HR email log for this candidate? This only resets the send status.')) return;
-    setNotifying(id);
+  // Permanently delete the whole candidate row from the pipeline.
+  const deleteRow = async (a) => {
+    if (!window.confirm(
+      `Delete ${a.full_name} (${a.ref_code}) permanently?\n\n` +
+      `This removes the application and its history. This cannot be undone.`
+    )) return;
+    setNotifying(a.id);
     try {
-      await api.del(`/applications/${id}/notify`);
+      await api.del(`/applications/${a.id}`);
       await load();
     } catch (err) {
       alert(err.message);
@@ -232,16 +234,9 @@ export default function Pipeline() {
                   <td className="sub">{date(a.created_at)}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     {a.notify_status === 'SENT' ? (
-                      <div>
-                        <span className="chip JOINED" title={a.notify_at ? `Sent ${date(a.notify_at)}` : 'Sent'}>
-                          Sent
-                        </span>
-                        <button className="ghost small" style={{ marginTop: 5, display: 'block' }}
-                                disabled={notifying === a.id}
-                                onClick={() => clearNotifyLog(a.id)}>
-                          Delete log
-                        </button>
-                      </div>
+                      <span className="chip JOINED" title={a.notify_at ? `Sent ${date(a.notify_at)}` : 'Sent'}>
+                        Sent
+                      </span>
                     ) : a.notify_status === 'FAILED' ? (
                       <div>
                         <span className="chip REJECTED" title={a.notify_error || 'Send failed'}>Failed</span>
@@ -249,11 +244,6 @@ export default function Pipeline() {
                                 disabled={notifying === a.id}
                                 onClick={() => resendNotify(a.id)}>
                           {notifying === a.id ? 'Sending…' : 'Resend'}
-                        </button>
-                        <button className="ghost small" style={{ marginTop: 5, display: 'block' }}
-                                disabled={notifying === a.id}
-                                onClick={() => clearNotifyLog(a.id)}>
-                          Delete log
                         </button>
                       </div>
                     ) : (
@@ -266,6 +256,11 @@ export default function Pipeline() {
                         </button>
                       </div>
                     )}
+                    <button className="ghost small" style={{ marginTop: 5, display: 'block', color: '#c0392b' }}
+                            disabled={notifying === a.id}
+                            onClick={() => deleteRow(a)}>
+                      Delete log
+                    </button>
                   </td>
                 </tr>
               ))}
