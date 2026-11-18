@@ -3,6 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, useAuth, PIPELINE, CLOSED, STATUS_LABEL, money, date, scoreBand } from '../api.jsx';
 import ResumeViewer from '../components/ResumeViewer.jsx';
 
+// Starter questions shown in the AI recruiter panel.
+const AI_SUGGESTIONS = [
+  'Give me the best 5 candidates and why.',
+  'Who has the most relevant experience?',
+  'Shortlist the strong candidates near Chennai.',
+  'Summarise this candidate pool.',
+];
+
 export default function Pipeline() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -20,6 +28,13 @@ export default function Pipeline() {
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [resumeFor, setResumeFor] = useState(null);   // {id, name} of the resume open in the viewer
+
+  // AI recruiter panel — asks Gemini about the candidates currently in view.
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiQ, setAiQ] = useState('');
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiErr, setAiErr] = useState('');
 
   const scope = company ? `company=${company}` : '';
 
@@ -45,6 +60,27 @@ export default function Pipeline() {
   // When filtered to one role (from the Openings count), name it so the view is self-explanatory.
   const jobRole = jobFilter ? (rows[0]?.job_title || rows[0]?.position_applied || 'this role') : '';
   const clearJob = () => { const n = new URLSearchParams(sp); n.delete('job'); setSp(n); };
+
+  // Ask the AI recruiter about the candidates currently in view (same filters as the list).
+  const askAI = async (question) => {
+    const qtext = ((question ?? aiQ) || '').trim();
+    if (!qtext) return;
+    setAiQ(qtext);
+    setAiBusy(true); setAiErr(''); setAiAnswer('');
+    const qs = new URLSearchParams();
+    if (company) qs.set('company', company);
+    if (status) qs.set('status', status);
+    if (search) qs.set('q', search);
+    if (jobFilter) qs.set('job', jobFilter);
+    try {
+      const res = await api.post(`/applications/recruiter?${qs}`, { question: qtext });
+      setAiAnswer(res.answer || '');
+    } catch (err) {
+      setAiErr(err.message);
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   // Re-read and re-score a resume whose extraction or scoring failed.
   const retryScore = async (id) => {
@@ -117,8 +153,58 @@ export default function Pipeline() {
           </select>
           <input placeholder="Search name, ref, role…" value={search}
                  onChange={(e) => setSearch(e.target.value)} style={{ width: 220 }} />
+          <button onClick={() => setAiOpen(true)}
+                  title="Ask the AI recruiter about the candidates currently in view">
+            ✨ AI recruiter
+          </button>
         </div>
       </div>
+
+      {aiOpen && (
+        <div className="overlay" onClick={(e) => e.target === e.currentTarget && setAiOpen(false)}>
+          <div className="dialog" style={{ maxWidth: 640 }} role="dialog" aria-modal="true">
+            <div className="dialog-head">
+              <div>
+                <div className="eyebrow">AI recruiter</div>
+                <h2>Ask about these candidates</h2>
+                <div className="sub">
+                  Reads the {rows.length} candidate{rows.length === 1 ? '' : 's'} currently in view
+                  {jobFilter ? ` for ${jobRole}` : ''} and answers. It advises only — it never moves or emails anyone.
+                </div>
+              </div>
+              <button type="button" className="dialog-close" onClick={() => setAiOpen(false)} aria-label="Close">×</button>
+            </div>
+
+            <div className="dialog-body">
+              <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {AI_SUGGESTIONS.map((s) => (
+                  <button key={s} className="ghost small" disabled={aiBusy} onClick={() => askAI(s)}>{s}</button>
+                ))}
+              </div>
+
+              <textarea value={aiQ} onChange={(e) => setAiQ(e.target.value)}
+                        placeholder="e.g. Who are the top 3 for this role and why?"
+                        style={{ minHeight: 72, width: '100%' }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) askAI(); }} />
+
+              {aiErr && <div className="error" style={{ marginTop: 12 }}>{aiErr}</div>}
+              {aiBusy && <div className="sub" style={{ marginTop: 14 }}>Reading the candidates…</div>}
+              {aiAnswer && !aiBusy && (
+                <div className="note" style={{ marginTop: 14, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                  {aiAnswer}
+                </div>
+              )}
+            </div>
+
+            <div className="dialog-foot">
+              <button type="button" className="ghost" onClick={() => setAiOpen(false)}>Close</button>
+              <button type="button" onClick={() => askAI()} disabled={aiBusy || !aiQ.trim()}>
+                {aiBusy ? 'Thinking…' : 'Ask'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {jobFilter && (
         <div className="note" style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12 }}>

@@ -8,6 +8,7 @@ import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
 import { syncWorkbook } from '../services/workbook.js';
 import { notifyHrOfApplication, emailInterviewForm } from '../services/notify.js';
+import { askRecruiter } from '../services/recruiter.js';
 
 const r = Router();
 r.use(requireAuth);
@@ -26,6 +27,41 @@ r.get('/stats', async (req, res) => {
     [company]
   );
   res.json({ pipeline: PIPELINE, closed: CLOSED, rows });
+});
+
+/**
+ * AI recruiter — ask a question across the candidates currently in view. The filters come in the
+ * query string (?company=&status=&job=&q=) exactly like the list, so company-access rules apply;
+ * the question is in the body. It reads a compact summary of each candidate and advises only.
+ */
+r.post('/recruiter', async (req, res) => {
+  const company = companyFilter(req);
+  const question = (req.body?.question || '').toString().slice(0, 1000);
+
+  const { rows } = await q(
+    `SELECT a.ref_code, a.full_name, a.position_applied, a.status,
+            a.total_experience, a.expected_ctc, a.notice_period_days,
+            COALESCE(NULLIF(a.current_location, ''),
+                     NULLIF(concat_ws(', ', a.area, a.city, a.pincode), '')) AS location,
+            a.ai_summary->>'headline'        AS ai_headline,
+            (a.ai_summary->>'score')::numeric AS ai_score,
+            j.title AS job_title
+       FROM applications a
+       JOIN companies c ON c.id = a.company_id
+       LEFT JOIN jobs j ON j.id = a.job_id
+      WHERE ($1::int[] IS NULL OR a.company_id = ANY($1))
+        AND ($2::text IS NULL OR a.status = $2)
+        AND ($3::int IS NULL OR a.job_id = $3)
+        AND ($4::text IS NULL OR a.full_name ILIKE '%'||$4||'%' OR a.email ILIKE '%'||$4||'%'
+             OR a.ref_code ILIKE '%'||$4||'%' OR a.position_applied ILIKE '%'||$4||'%')
+      ORDER BY (a.ai_summary->>'score')::numeric DESC NULLS LAST, a.created_at DESC
+      LIMIT 150`,
+    [company, req.query.status || null, req.query.job || null, req.query.q || null]
+  );
+
+  const result = await askRecruiter(question, rows);
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ answer: result.answer, considered: rows.length });
 });
 
 /** List with filters: ?status=&company=&job=&q= */
