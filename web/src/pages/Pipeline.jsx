@@ -107,7 +107,9 @@ export default function Pipeline() {
   };
 
   // AI recruiter — send the candidate their 5-minute AI first-round interview link.
+  const [recOpen, setRecOpen] = useState(false);     // AI Recruiter panel (top button)
   const [interviewing, setInterviewing] = useState(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const sendInterview = async (a) => {
     if (a.interview_status && !window.confirm(
       `Re-send the AI interview link to ${a.full_name}?`
@@ -121,6 +123,23 @@ export default function Pipeline() {
     } finally {
       setInterviewing(null);
     }
+  };
+
+  // Send the AI interview to everyone in view who hasn't been invited yet.
+  const sendAllInterviews = async () => {
+    const targets = rows.filter(
+      (a) => a.email && !['INVITED', 'IN_PROGRESS', 'DONE'].includes(a.interview_status)
+    );
+    if (!targets.length) { alert('Everyone in view has already been invited.'); return; }
+    if (!window.confirm(`Send the AI interview link to ${targets.length} candidate(s) who haven't been invited yet?`)) return;
+    setBulkBusy(true);
+    let ok = 0, fail = 0;
+    for (const a of targets) {
+      try { await api.post(`/applications/${a.id}/send-interview`); ok += 1; } catch { fail += 1; }
+    }
+    setBulkBusy(false);
+    await load();
+    alert(`Sent ${ok} interview${ok === 1 ? '' : 's'}${fail ? `, ${fail} failed` : ''}.`);
   };
 
   // One-click advance to the next pipeline stage, straight from the list.
@@ -267,12 +286,87 @@ export default function Pipeline() {
           </select>
           <input placeholder="Search name, ref, role…" value={search}
                  onChange={(e) => setSearch(e.target.value)} style={{ width: 220 }} />
+          <button onClick={() => setRecOpen(true)}
+                  title="Send the AI first-round interview to candidates and see their scores">
+            ✨ AI recruiter
+          </button>
           <button className="primary" onClick={openAdd}
                   title="Add a candidate who applied off-portal (walk-in, referral, email)">
             + Add candidate
           </button>
         </div>
       </div>
+
+      {recOpen && (() => {
+        const done = rows.filter((a) => a.interview_status === 'DONE');
+        const invited = rows.filter((a) => ['INVITED', 'IN_PROGRESS'].includes(a.interview_status));
+        const notYet = rows.filter((a) => a.email && !['INVITED', 'IN_PROGRESS', 'DONE'].includes(a.interview_status));
+        return (
+          <div className="overlay" onClick={(e) => e.target === e.currentTarget && setRecOpen(false)}>
+            <div className="dialog" style={{ maxWidth: 640 }} role="dialog" aria-modal="true">
+              <div className="dialog-head">
+                <div>
+                  <div className="eyebrow">AI recruiter</div>
+                  <h2>AI first-round interviews</h2>
+                  <div className="sub">
+                    Sends each candidate a private 5-minute AI video interview. The AI asks them to
+                    introduce themselves, then questions them on their resume and the role, and scores the result.
+                  </div>
+                </div>
+                <button type="button" className="dialog-close" onClick={() => setRecOpen(false)} aria-label="Close">×</button>
+              </div>
+
+              <div className="dialog-body">
+                <div className="row" style={{ gap: 18, marginBottom: 14 }}>
+                  <span className="sub"><strong style={{ color: 'var(--ink)' }}>{notYet.length}</strong> not invited</span>
+                  <span className="sub"><strong style={{ color: 'var(--ink)' }}>{invited.length}</strong> invited / in progress</span>
+                  <span className="sub"><strong style={{ color: 'var(--ink)' }}>{done.length}</strong> completed</span>
+                </div>
+
+                <button className="primary" disabled={bulkBusy || !notYet.length} onClick={sendAllInterviews}>
+                  {bulkBusy ? 'Sending…' : `Send interview to all ${notYet.length} not invited`}
+                </button>
+
+                <div style={{ maxHeight: 320, overflowY: 'auto', marginTop: 16 }}>
+                  <table>
+                    <tbody>
+                      {rows.map((a) => (
+                        <tr key={a.id}>
+                          <td>
+                            <div className="name">{a.full_name}</div>
+                            <div className="ref">{a.position_applied}</div>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            {a.interview_status === 'DONE' ? (
+                              a.interview_score != null
+                                ? <span className={`score ${scoreBand(a.interview_score)}`}>{Number(a.interview_score).toFixed(1)}<small>/10</small></span>
+                                : <span className="chip JOINED">Done</span>
+                            ) : a.interview_status === 'IN_PROGRESS' ? (
+                              <span className="chip INTERVIEW_SCORE">In progress</span>
+                            ) : a.interview_status === 'INVITED' ? (
+                              <button className="ghost small" disabled={interviewing === a.id} onClick={() => sendInterview(a)}>
+                                {interviewing === a.id ? 'Sending…' : 'Invited · Resend'}
+                              </button>
+                            ) : (
+                              <button className="ghost small" disabled={interviewing === a.id || !a.email} onClick={() => sendInterview(a)}>
+                                {interviewing === a.id ? 'Sending…' : 'Send interview'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="dialog-foot">
+                <button type="button" className="ghost" onClick={() => setRecOpen(false)}>Close</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {addOpen && (
         <div className="overlay" onClick={(e) => e.target === e.currentTarget && setAddOpen(false)}>
