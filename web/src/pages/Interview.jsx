@@ -39,6 +39,11 @@ h1{font-size:24px;margin:0 0 6px;color:#fff}
 `;
 
 const MAX_ANSWER_MS = 30000;
+const INTERVIEW_MS = 5 * 60 * 1000;        // the whole first round is capped at 5 minutes
+const mmss = (ms) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
 
 export default function Interview() {
   const { token } = useParams();
@@ -47,6 +52,7 @@ export default function Interview() {
   const [phase, setPhase] = useState('loading'); // loading|intro|speaking|recording|processing|finished|closed
   const [prompt, setPrompt] = useState('');
   const [secs, setSecs] = useState(0);
+  const [left, setLeft] = useState(INTERVIEW_MS);   // whole-interview time remaining
   const [transcript, setTranscript] = useState([]);
 
   const streamRef = useRef(null);
@@ -54,6 +60,8 @@ export default function Interview() {
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const countRef = useRef(null);
+  const endRef = useRef(0);        // wall-clock time the 5-minute cap is reached
+  const overallRef = useRef(null); // interval ticking the overall countdown
 
   useEffect(() => {
     api.get(`/public/interview/${token}`)
@@ -64,7 +72,7 @@ export default function Interview() {
   }, [token]);
 
   const stopAll = () => {
-    clearTimeout(timerRef.current); clearInterval(countRef.current);
+    clearTimeout(timerRef.current); clearInterval(countRef.current); clearInterval(overallRef.current);
     try { recRef.current && recRef.current.state !== 'inactive' && recRef.current.stop(); } catch { /* */ }
     try { streamRef.current && streamRef.current.getTracks().forEach((t) => t.stop()); } catch { /* */ }
   };
@@ -137,6 +145,19 @@ export default function Interview() {
       return;
     }
     setPhase('speaking');
+    // Start the overall 5-minute clock; when it runs out we stop the current answer and let the
+    // server wrap up and score on that final submission.
+    endRef.current = Date.now() + INTERVIEW_MS;
+    setLeft(INTERVIEW_MS);
+    clearInterval(overallRef.current);
+    overallRef.current = setInterval(() => {
+      const rem = endRef.current - Date.now();
+      setLeft(rem);
+      if (rem <= 0) {
+        clearInterval(overallRef.current);
+        if (recRef.current && recRef.current.state !== 'inactive') stopRecording();
+      }
+    }, 500);
     try {
       const res = await api.post(`/public/interview/${token}/start`);
       setPrompt(res.text || '');
@@ -211,7 +232,9 @@ export default function Interview() {
               <span className={`iv-dot ${phase === 'recording' ? 'rec' : phase === 'speaking' ? 'ai' : ''}`} />
               {phase === 'speaking' ? 'AI is speaking…' : phase === 'recording' ? 'Recording your answer' : 'Processing…'}
             </div>
-            {phase === 'recording' && <div className="iv-timer">{Math.max(0, 30 - secs)}s</div>}
+            <div className="iv-timer">
+              {phase === 'recording' ? `${Math.max(0, 30 - secs)}s` : mmss(left)}
+            </div>
           </div>
           <div className="iv-body">
             <div className="iv-prompt">{prompt}</div>
@@ -220,7 +243,10 @@ export default function Interview() {
               {phase === 'speaking' && <span className="sub">Listen to the question…</span>}
               {phase === 'processing' && <span className="sub">One moment…</span>}
             </div>
-            <div className="iv-note">Keep answers under 30 seconds — they stop automatically at the limit.</div>
+            <div className="iv-note">
+              This interview lasts about 5 minutes — <strong style={{ color: '#cfe0f7' }}>{mmss(left)}</strong> remaining.
+              Keep each answer under 30 seconds; it stops automatically at the limit.
+            </div>
           </div>
         </div>
       )}
