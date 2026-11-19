@@ -53,6 +53,7 @@ export default function Pipeline() {
   const [rows, setRows] = useState([]);
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);                // current page of the candidate list
   const [resumeFor, setResumeFor] = useState(null);   // {id, name} of the resume open in the viewer
 
   // "Add candidate" — HR enters someone who applied off-portal.
@@ -87,7 +88,13 @@ export default function Pipeline() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [company, status, search, sort, scope, jobFilter]);
+  useEffect(() => { setPage(1); load(); }, [company, status, search, sort, scope, jobFilter]);
+
+  // Paginate the list so there's little to scroll — a page of candidates at a time.
+  const PAGE_SIZE = 20;
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const pageRows = rows.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   // When filtered to one role (from the Openings count), name it so the view is self-explanatory.
   const jobRole = jobFilter ? (rows[0]?.job_title || rows[0]?.position_applied || 'this role') : '';
@@ -612,7 +619,7 @@ export default function Pipeline() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((a) => (
+              {pageRows.map((a) => (
                 <tr key={a.id} onClick={() => navigate(`/applications/${a.id}`)}>
                   <td className="co" style={{ borderLeftColor: a.colour }}>
                     <div className="name">{a.full_name}</div>
@@ -770,6 +777,22 @@ export default function Pipeline() {
           </table>
         )}
       </div>
+
+      {!loading && rows.length > PAGE_SIZE && (
+        <div className="row" style={{ justifyContent: 'center', alignItems: 'center', gap: 14, marginTop: 16 }}>
+          <button className="ghost small" disabled={pageSafe <= 1} onClick={() => setPage(pageSafe - 1)}>
+            ← Previous
+          </button>
+          <span className="sub">
+            Page {pageSafe} of {totalPages}
+            <span style={{ margin: '0 8px', opacity: 0.5 }}>·</span>
+            {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, rows.length)} of {rows.length}
+          </span>
+          <button className="ghost small" disabled={pageSafe >= totalPages} onClick={() => setPage(pageSafe + 1)}>
+            Next →
+          </button>
+        </div>
+      )}
     </>
   );
 }
