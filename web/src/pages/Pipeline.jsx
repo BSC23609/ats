@@ -483,16 +483,14 @@ export default function Pipeline() {
               </div>
 
               <div className="dialog-body">
-                <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                  {reasons.map((rsn) => (
-                    <button key={rsn} type="button"
-                            className={`ghost small ${closeReason === rsn ? 'on' : ''}`}
-                            style={closeReason === rsn ? { borderColor: 'var(--navy, #0A2B66)', fontWeight: 700 } : undefined}
-                            onClick={() => setCloseReason(rsn)}>
-                      {rsn}
-                    </button>
-                  ))}
-                </div>
+                <label>
+                  <span>Reason</span>
+                  <select value={closeReason} onChange={(e) => setCloseReason(e.target.value)}
+                          style={{ width: '100%' }}>
+                    <option value="">Select a reason…</option>
+                    {reasons.map((rsn) => <option key={rsn} value={rsn}>{rsn}</option>)}
+                  </select>
+                </label>
                 <textarea
                   value={closeNote}
                   onChange={(e) => setCloseNote(e.target.value)}
