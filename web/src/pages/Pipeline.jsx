@@ -596,6 +596,7 @@ export default function Pipeline() {
                 <th>Applied</th>
                 <th>HR email</th>
                 <th>Actions</th>
+                <th>Interview score</th>
               </tr>
             </thead>
             <tbody>
@@ -655,14 +656,7 @@ export default function Pipeline() {
                   <td><span className={`chip ${a.status}`}>{STATUS_LABEL[a.status]}</span></td>
                   <td onClick={(e) => e.stopPropagation()}>
                     {a.interview_status === 'DONE' ? (
-                      a.interview_score != null ? (
-                        <span className={`score ${scoreBand(a.interview_score)}`}
-                              title="AI interview score">
-                          {Number(a.interview_score).toFixed(1)}<small>/10</small>
-                        </span>
-                      ) : (
-                        <span className="chip JOINED">Done</span>
-                      )
+                      <span className="chip JOINED" title="AI interview completed">Done</span>
                     ) : a.interview_status === 'IN_PROGRESS' ? (
                       <span className="chip INTERVIEW_SCORE">In progress</span>
                     ) : a.interview_status === 'INVITED' ? (
@@ -740,6 +734,22 @@ export default function Pipeline() {
                           Withdraw
                         </button>
                       </div>
+                    )}
+                  </td>
+                  <td>
+                    {a.interview_score != null ? (
+                      <span className={`score ${scoreBand(a.interview_score)}`}
+                            title="Performance score from the AI first-round interview">
+                        {Number(a.interview_score).toFixed(1)}<small>/10</small>
+                      </span>
+                    ) : a.interview_status === 'DONE' ? (
+                      <span className="sub" title="Interview finished but could not be scored">Not scored</span>
+                    ) : a.interview_status === 'IN_PROGRESS' ? (
+                      <span className="sub">In progress…</span>
+                    ) : a.interview_status === 'INVITED' ? (
+                      <span className="sub">Awaiting</span>
+                    ) : (
+                      <span className="sub">—</span>
                     )}
                   </td>
                 </tr>
