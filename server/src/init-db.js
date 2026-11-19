@@ -27,6 +27,7 @@ export async function migrate() {
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS city    TEXT`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS pincode TEXT`,
     `ALTER TABLE jobs         ADD COLUMN IF NOT EXISTS max_experience INT`,
+    `ALTER TABLE jobs         ADD COLUMN IF NOT EXISTS jd_doc JSONB`,
     `ALTER TABLE users        ADD COLUMN IF NOT EXISTS phone TEXT`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_error TEXT`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS notify_status TEXT`,

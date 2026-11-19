@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, useAuth, date, experienceRange } from '../api.jsx';
 import RichText from '../components/RichText.jsx';
@@ -25,6 +25,59 @@ export default function Jobs() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null); // which opening's link was just copied
+
+  // AI JD writer state.
+  const createFormRef = useRef(null);
+  const [createDoc, setCreateDoc] = useState(null); // generated jd_doc held until the opening is created
+  const [genNotes, setGenNotes] = useState('');     // "key points" for the create form
+  const [editNotes, setEditNotes] = useState('');   // "key points" for the edit form
+  const [genBusy, setGenBusy] = useState(false);
+  const [genErr, setGenErr] = useState('');
+
+  // Ask the server to write a JD from the basic details; hand the result to the open form.
+  const generateJD = async (fields, onResult) => {
+    if (!fields.title || !fields.title.trim()) { setGenErr('Enter a job title first.'); return; }
+    setGenBusy(true); setGenErr('');
+    try {
+      const res = await api.post('/jobs/generate-jd', fields);
+      onResult(res); // { jd_doc, description }
+    } catch (err) {
+      setGenErr(err.message);
+    } finally {
+      setGenBusy(false);
+    }
+  };
+
+  const genForCreate = () => {
+    const f = createFormRef.current ? Object.fromEntries(new FormData(createFormRef.current)) : {};
+    const comp = companies.find((c) => String(c.id) === String(f.company_id));
+    generateJD(
+      {
+        title: f.title, department: f.department, location: f.location,
+        employment_type: f.employment_type || 'Full-time',
+        min_experience: f.min_experience, max_experience: f.max_experience,
+        company_name: comp?.name, notes: genNotes,
+      },
+      (res) => { setDesc(res.description || ''); setCreateDoc(res.jd_doc || null); }
+    );
+  };
+
+  const genForEdit = () => {
+    const comp = companies.find((c) => String(c.id) === String(editing.company_id));
+    generateJD(
+      {
+        title: editing.title, department: editing.department, location: editing.location,
+        employment_type: editing.employment_type,
+        min_experience: editing.min_experience, max_experience: editing.max_experience,
+        company_name: comp?.name, notes: editNotes,
+      },
+      (res) => setEditing((j) => ({
+        ...j,
+        description: res.description || j.description,
+        jd_doc: res.jd_doc || j.jd_doc,
+      }))
+    );
+  };
 
   // Open the role's application form in a new tab AND copy its link (to paste on job portals).
   const copyLink = async (j) => {
@@ -75,9 +128,12 @@ export default function Jobs() {
     setError('');
     const body = Object.fromEntries(new FormData(e.target));
     try {
-      await api.post('/jobs', { ...body, description: desc });
+      await api.post('/jobs', { ...body, description: desc, jd_doc: createDoc });
       setAdding(false);
       setDesc('');
+      setCreateDoc(null);
+      setGenNotes('');
+      setGenErr('');
       load();
     } catch (err) {
       setError(err.message);
@@ -119,8 +175,11 @@ export default function Jobs() {
   const openEdit = (j) => {
     setError('');
     setMsg('');
+    setGenErr('');
+    setEditNotes('');
     setEditing({
       id: j.id,
+      company_id: j.company_id,
       title: j.title,
       department: j.department || '',
       location: j.location || '',
@@ -129,6 +188,7 @@ export default function Jobs() {
       max_experience: j.max_experience ?? '',
       description: j.description || '',
       status: j.status,
+      jd_doc: j.jd_doc || null,
     });
   };
 
@@ -327,6 +387,20 @@ export default function Jobs() {
                 </div>
               </div>
 
+              <div className="field">
+                <label>Rewrite with AI (optional)</label>
+                <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)}
+                          style={{ minHeight: 56 }}
+                          placeholder="Key points / must-have skills to include (optional)…" />
+                <div className="row" style={{ gap: 8, marginTop: 8, alignItems: 'center' }}>
+                  <button type="button" className="ghost" onClick={genForEdit} disabled={genBusy}>
+                    {genBusy ? 'Writing…' : '✨ Generate JD with AI'}
+                  </button>
+                  {editing.jd_doc && <span className="sub">A branded JD page is attached to this role.</span>}
+                </div>
+                {genErr && <div className="error" style={{ marginTop: 8 }}>{genErr}</div>}
+              </div>
+
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>What the role involves</label>
                 <RichText value={editing.description} minHeight={260}
@@ -399,7 +473,7 @@ export default function Jobs() {
       )}
 
       {adding && (
-        <form className="panel" onSubmit={create} style={{ marginBottom: 16 }}>
+        <form className="panel" onSubmit={create} style={{ marginBottom: 16 }} ref={createFormRef}>
           <div className="panel-head"><h2>New opening</h2></div>
           <div className="panel-body">
             {error && <div className="error" style={{ marginBottom: 14 }}>{error}</div>}
@@ -434,6 +508,20 @@ export default function Jobs() {
                        placeholder="No limit" />
               </div>
             </div>
+            <div className="field">
+              <label>Write the description with AI (optional)</label>
+              <textarea value={genNotes} onChange={(e) => setGenNotes(e.target.value)}
+                        style={{ minHeight: 60 }}
+                        placeholder="Key points / must-have skills to include (optional). Fill in the title and other fields above first…" />
+              <div className="row" style={{ gap: 8, marginTop: 8, alignItems: 'center' }}>
+                <button type="button" className="ghost" onClick={genForCreate} disabled={genBusy}>
+                  {genBusy ? 'Writing…' : '✨ Generate JD with AI'}
+                </button>
+                {createDoc && <span className="sub">JD written — review the description below; a branded JD page is created too.</span>}
+              </div>
+              {genErr && <div className="error" style={{ marginTop: 8 }}>{genErr}</div>}
+            </div>
+
             <div className="field">
               <label htmlFor="description">What the role involves</label>
               <RichText value={desc} onChange={setDesc}
@@ -498,6 +586,10 @@ export default function Jobs() {
                       <button className="ghost small" onClick={() => copyLink(j)}
                               title="Open this role's application form in a new tab and copy its link to share on job portals">
                         {copiedId === j.id ? 'Opened · link copied' : 'Copy link'}
+                      </button>
+                      <button className="ghost small" onClick={() => window.open(`/jd/${j.id}`, '_blank', 'noopener')}
+                              title="Open the branded job description page — print or share it">
+                        JD page
                       </button>
                       <button className="ghost small" onClick={() => openEdit(j)}>Edit</button>
                       <button className="ghost small" onClick={() => { setJd(j); setJdText(''); setJdFile(null); setMsg(''); }}>

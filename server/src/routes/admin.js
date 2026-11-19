@@ -10,6 +10,7 @@ import { safeName } from '../services/graph.js';
 import { syncWorkbook } from '../services/workbook.js';
 import { describeRange } from '../services/html.js';
 import { sanitise } from '../services/html.js';
+import { generateJD, renderJdHtml } from '../services/jdwriter.js';
 
 
 export const employees = Router();
@@ -78,7 +79,8 @@ jobs.get('/', async (req, res) => {
   const { rows } = await q(
     `SELECT j.id, j.company_id, j.title, j.department, j.location, j.employment_type,
             j.min_experience, j.max_experience, j.description, j.status, j.created_at,
-            j.jd_filename, (j.jd_text IS NOT NULL) AS has_jd,
+            j.jd_filename, (j.jd_text IS NOT NULL) AS has_jd, j.jd_doc,
+            (j.jd_doc IS NOT NULL) AS has_jd_doc,
             c.code AS company_code, c.colour,
             (SELECT count(*)::int FROM applications a WHERE a.job_id = j.id) AS applicant_count
        FROM jobs j JOIN companies c ON c.id = j.company_id
@@ -87,6 +89,26 @@ jobs.get('/', async (req, res) => {
     [company]
   );
   res.json(rows);
+});
+
+/**
+ * Write a job description with AI from the basic details. Returns the structured JD (jd_doc) for
+ * the branded page and the HTML to drop into the careers-page description. Saves nothing itself —
+ * the form sends jd_doc and description back when the opening is created or updated.
+ */
+jobs.post('/generate-jd', async (req, res) => {
+  const b = req.body || {};
+  const { jd_doc, error } = await generateJD({
+    title: b.title,
+    department: b.department,
+    location: b.location,
+    employment_type: b.employment_type,
+    experience: describeRange(b.min_experience, b.max_experience) || undefined,
+    company: b.company_name,
+    notes: b.notes,
+  });
+  if (error) return res.status(400).json({ error });
+  res.json({ jd_doc, description: renderJdHtml(jd_doc) });
 });
 
 jobs.post('/', async (req, res) => {
@@ -103,10 +125,10 @@ jobs.post('/', async (req, res) => {
 
   const { rows } = await q(
     `INSERT INTO jobs (company_id, title, department, location, employment_type,
-                       min_experience, max_experience, description, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+                       min_experience, max_experience, description, jd_doc, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
     [companyId, b.title, b.department || null, b.location || null, b.employment_type || 'Full-time',
-     min, max, sanitise(b.description), req.user.id]
+     min, max, sanitise(b.description), b.jd_doc || null, req.user.id]
   );
   res.status(201).json(rows[0]);
 });
@@ -120,7 +142,7 @@ jobs.patch('/:id', async (req, res) => {
   if (!assertCompanyAccess(req, res, job.company_id)) return;
 
   const f = ['title', 'department', 'location', 'employment_type',
-             'min_experience', 'max_experience', 'description', 'status'];
+             'min_experience', 'max_experience', 'description', 'status', 'jd_doc'];
   const set = f.filter((k) => k in req.body);
   if (!set.length) return res.status(400).json({ error: 'Nothing to update.' });
 

@@ -4,6 +4,7 @@ import Login from './pages/Login.jsx';
 import GroupSso from './pages/GroupSso.jsx';
 import Careers from './pages/Careers.jsx';
 import FullForm from './pages/FullForm.jsx';
+import JDView from './pages/JDView.jsx';
 import Pipeline from './pages/Pipeline.jsx';
 import ApplicationDetail from './pages/ApplicationDetail.jsx';
 import Employees from './pages/Employees.jsx';
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/auth/sso" element={<GroupSso />} />
           <Route path="/careers" element={<Careers />} />
+          <Route path="/jd/:id" element={<JDView />} />
           <Route path="/form/:token" element={<FullForm />} />
 
           <Route path="/pipeline" element={<Private><Pipeline /></Private>} />

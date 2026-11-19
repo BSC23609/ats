@@ -55,6 +55,21 @@ r.get('/openings/:id', async (req, res) => {
   res.json(job);
 });
 
+/** The branded, shareable JD for one role — reads the AI-written jd_doc. Public so a link can be
+ *  shared on job portals or sent to a candidate; works whether or not the role is still open. */
+r.get('/jobs/:id/jd', async (req, res) => {
+  const job = await one(
+    `SELECT j.id, j.title, j.department, j.location, j.employment_type,
+            j.min_experience, j.max_experience, j.status, j.jd_doc,
+            c.code AS company_code, c.name AS company_name
+       FROM jobs j JOIN companies c ON c.id = j.company_id
+      WHERE j.id = $1 AND c.active`,
+    [req.params.id]
+  );
+  if (!job) return res.status(404).json({ error: 'This role is not available.' });
+  res.json(job);
+});
+
 /** Stage 1 — candidate applies from the careers page. */
 r.post('/apply', upload.single('resume'), async (req, res) => {
   try {

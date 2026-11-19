@@ -63,6 +63,9 @@ CREATE TABLE jobs (
   min_experience NUMERIC(4,1) DEFAULT 0,
   description    TEXT,
 
+  -- The AI-written structured job description, rendered by the branded JD page.
+  jd_doc         JSONB,
+
   -- The uploaded job description. jd_text is what the resume is actually scored against.
   jd_path        TEXT,
   jd_filename    TEXT,
