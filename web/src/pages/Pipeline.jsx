@@ -572,7 +572,7 @@ export default function Pipeline() {
         ))}
       </div>
 
-      <div className="panel">
+      <div className="panel scroll-xy">
         {loading ? (
           <div className="empty">Loading candidates…</div>
         ) : !rows.length ? (

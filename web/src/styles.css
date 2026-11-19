@@ -141,6 +141,9 @@ main { padding: 30px 34px 70px; max-width: 1440px; }
 
 /* ---------- panels ---------- */
 .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); overflow-x: auto; }
+/* Pipeline table: scroll both ways inside the panel, with a sticky header row. */
+.panel.scroll-xy { max-height: calc(100vh - 230px); overflow: auto; }
+.panel.scroll-xy thead th { position: sticky; top: 0; background: var(--card); z-index: 2; }
 .panel-head {
   padding: 13px 17px; border-bottom: 1px solid var(--line-soft);
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
