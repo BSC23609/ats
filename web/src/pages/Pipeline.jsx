@@ -11,6 +11,28 @@ const AI_SUGGESTIONS = [
   'Summarise this candidate pool.',
 ];
 
+// Common reasons offered when closing a candidate out — recorded on the application and its history.
+const REJECT_REASONS = [
+  'Salary expectation too high',
+  'Location not suitable',
+  'Insufficient experience',
+  'Skills / qualification mismatch',
+  'Did not clear the interview',
+  'Notice period too long',
+  'Position already filled',
+  'No-show / unresponsive',
+  'Other',
+];
+const WITHDRAW_REASONS = [
+  'Accepted another offer',
+  'Salary expectation not met',
+  'Location not suitable',
+  'Personal reasons',
+  'No longer interested',
+  'Unreachable',
+  'Other',
+];
+
 export default function Pipeline() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -139,12 +161,29 @@ export default function Pipeline() {
     }
   };
 
-  // Close a candidate out of the pipeline — Reject or Withdraw — from the list.
-  const moveTo = async (a, status, confirmMsg) => {
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
+  // Close a candidate out of the pipeline — Reject or Withdraw — with a recorded reason.
+  const [closeFor, setCloseFor] = useState(null);   // { a, status } while the reason dialog is open
+  const [closeReason, setCloseReason] = useState('');
+  const [closeNote, setCloseNote] = useState('');
+
+  const openClose = (a, status) => {
+    setCloseFor({ a, status });
+    setCloseReason('');
+    setCloseNote('');
+  };
+
+  const confirmClose = async () => {
+    if (!closeFor) return;
+    const { a, status } = closeFor;
+    // Build the note: the chosen reason, plus any free-text detail. "Other" uses the detail alone.
+    const detail = closeNote.trim();
+    const note = closeReason && closeReason !== 'Other'
+      ? (detail ? `${closeReason} — ${detail}` : closeReason)
+      : detail;
     setProceeding(a.id);
     try {
-      await api.post(`/applications/${a.id}/status`, { status });
+      await api.post(`/applications/${a.id}/status`, { status, note: note || null });
+      setCloseFor(null);
       await load();
     } catch (err) {
       alert(err.message);
@@ -423,6 +462,60 @@ export default function Pipeline() {
         </div>
       )}
 
+      {closeFor && (() => {
+        const isReject = closeFor.status === 'REJECTED';
+        const reasons = isReject ? REJECT_REASONS : WITHDRAW_REASONS;
+        const needDetail = closeReason === 'Other';
+        return (
+          <div className="overlay" onClick={(e) => e.target === e.currentTarget && setCloseFor(null)}>
+            <div className="dialog" style={{ maxWidth: 480 }} role="dialog" aria-modal="true">
+              <div className="dialog-head">
+                <div>
+                  <div className="eyebrow">{isReject ? 'Reject candidate' : 'Withdraw candidate'}</div>
+                  <h2>{closeFor.a.full_name}</h2>
+                  <div className="sub">
+                    {isReject
+                      ? 'Why is this candidate being rejected? The reason is saved to their history.'
+                      : 'Why is this candidate withdrawing? The reason is saved to their history.'}
+                  </div>
+                </div>
+                <button type="button" className="dialog-close" onClick={() => setCloseFor(null)} aria-label="Close">×</button>
+              </div>
+
+              <div className="dialog-body">
+                <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                  {reasons.map((rsn) => (
+                    <button key={rsn} type="button"
+                            className={`ghost small ${closeReason === rsn ? 'on' : ''}`}
+                            style={closeReason === rsn ? { borderColor: 'var(--navy, #0A2B66)', fontWeight: 700 } : undefined}
+                            onClick={() => setCloseReason(rsn)}>
+                      {rsn}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={closeNote}
+                  onChange={(e) => setCloseNote(e.target.value)}
+                  placeholder={needDetail ? 'Type the reason…' : 'Add a note (optional)'}
+                  style={{ minHeight: 70, width: '100%', marginTop: 12 }}
+                />
+              </div>
+
+              <div className="dialog-foot">
+                <button type="button" className="ghost" onClick={() => setCloseFor(null)}>Cancel</button>
+                <button type="button"
+                        className="primary"
+                        style={isReject ? { background: '#c0392b', borderColor: '#c0392b' } : undefined}
+                        disabled={proceeding === closeFor.a.id || (!closeReason && !closeNote.trim()) || (needDetail && !closeNote.trim())}
+                        onClick={confirmClose}>
+                  {proceeding === closeFor.a.id ? 'Saving…' : (isReject ? 'Reject' : 'Withdraw')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {jobFilter && (
         <div className="note" style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
           <span>Showing applicants for <strong>{jobRole}</strong>.</span>
@@ -582,13 +675,13 @@ export default function Pipeline() {
                         <button className="ghost small" style={{ color: '#c0392b' }}
                                 disabled={proceeding === a.id}
                                 title={`Reject ${a.full_name}`}
-                                onClick={() => moveTo(a, 'REJECTED', `Reject ${a.full_name} (${a.ref_code})?`)}>
+                                onClick={() => openClose(a, 'REJECTED')}>
                           Reject
                         </button>
                         <button className="ghost small"
                                 disabled={proceeding === a.id}
                                 title={`Mark ${a.full_name} as withdrawn`}
-                                onClick={() => moveTo(a, 'WITHDRAWN', `Mark ${a.full_name} (${a.ref_code}) as withdrawn?`)}>
+                                onClick={() => openClose(a, 'WITHDRAWN')}>
                           Withdraw
                         </button>
                       </div>
