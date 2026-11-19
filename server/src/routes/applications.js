@@ -7,7 +7,7 @@ import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
 import { syncWorkbook } from '../services/workbook.js';
-import { notifyHrOfApplication, emailInterviewForm } from '../services/notify.js';
+import { notifyHrOfApplication, emailInterviewForm, emailAiInterview } from '../services/notify.js';
 import { askRecruiter } from '../services/recruiter.js';
 
 const r = Router();
@@ -171,6 +171,7 @@ r.get('/', async (req, res) => {
             a.total_experience, a.expected_ctc, a.notice_period_days, a.created_at, a.interview_at,
             a.stage2_submitted_at, a.ai_status, a.ai_error, a.resume_filename,
             a.notify_status, a.notify_at,
+            a.interview_status, a.interview_score,
             a.ai_summary->>'headline'      AS ai_headline,
             a.ai_summary->>'fit_for_role'  AS ai_fit,
             (a.ai_summary->>'score')::numeric AS ai_score,
@@ -303,6 +304,30 @@ r.post('/:id/notify', async (req, res, next) => {
 
     const result = await notifyHrOfApplication(Number(req.params.id));
     if (!result.sent) return res.status(400).json({ error: result.reason || 'Could not send the email.' });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Send (or re-send) the candidate their AI first-round interview link, and mark it invited. */
+r.post('/:id/send-interview', async (req, res, next) => {
+  try {
+    const app = await one('SELECT company_id, interview_status FROM applications WHERE id=$1', [req.params.id]);
+    if (!app) return res.status(404).json({ error: 'Application not found.' });
+    if (!assertCompanyAccess(req, res, app.company_id)) return;
+    if (app.interview_status === 'DONE')
+      return res.status(400).json({ error: 'This candidate has already completed the AI interview.' });
+
+    const result = await emailAiInterview(Number(req.params.id));
+    if (!result.sent) return res.status(400).json({ error: result.reason || 'Could not send the interview link.' });
+
+    // Mark as invited (unless they've already started), so the pipeline can show the state.
+    await q(
+      `UPDATE applications SET interview_status='INVITED', updated_at=now()
+        WHERE id=$1 AND (interview_status IS NULL OR interview_status NOT IN ('IN_PROGRESS','DONE'))`,
+      [req.params.id]
+    );
     res.json({ ok: true });
   } catch (err) {
     next(err);

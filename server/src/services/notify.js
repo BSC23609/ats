@@ -209,3 +209,65 @@ export async function emailInterviewForm(appId) {
     return { sent: false, reason: err.message };
   }
 }
+
+/** Email the candidate their private AI first-round interview link. */
+export async function emailAiInterview(appId) {
+  try {
+    const app = await one(
+      `SELECT a.*, c.code AS company_code, c.name AS company_name
+         FROM applications a JOIN companies c ON c.id = a.company_id
+        WHERE a.id = $1`,
+      [appId]
+    );
+    if (!app) return { sent: false, reason: 'Application not found.' };
+    if (!app.email) return { sent: false, reason: 'Candidate has no email on file.' };
+    if (!app.interview_token) return { sent: false, reason: 'No interview link for this candidate.' };
+    if (!graphConfigured()) return { sent: false, reason: 'Email not configured.' };
+
+    const base = (process.env.PUBLIC_WEB_URL || '').replace(/\/+$/, '');
+    if (!base) return { sent: false, reason: 'PUBLIC_WEB_URL is not set.' };
+    const link = `${base}/interview/${app.interview_token}`;
+
+    const hrReply = process.env.GRAPH_MAIL_FROM || process.env.GRAPH_DRIVE_USER || 'hr@bharatsteels.in';
+
+    const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#101519">
+        <p>Dear ${esc(app.full_name)},</p>
+        <p>
+          Thank you for applying for <strong>${esc(app.position_applied)}</strong> at
+          ${esc(app.company_name)}. As the first step, we would like you to complete a short
+          <strong>AI-led video interview</strong>. It takes about five minutes.
+        </p>
+        <p style="margin:6px 0 0"><strong>Before you start:</strong></p>
+        <ul style="margin:6px 0 0;padding-left:20px;color:#3a434b">
+          <li>Use a laptop or phone with a working camera and microphone.</li>
+          <li>Find a quiet, well-lit spot and a stable internet connection.</li>
+          <li>You'll introduce yourself first, then answer a few questions. Each answer is up to 30 seconds.</li>
+        </ul>
+        <p style="margin:22px 0">
+          <a href="${link}" style="background:#0a2b66;color:#fff;text-decoration:none;
+             padding:12px 22px;border-radius:4px;font-weight:600;display:inline-block">
+            Start your AI interview
+          </a>
+        </p>
+        <p style="color:#697178;font-size:13px">
+          Or paste this link into your browser:<br>
+          <a href="${link}">${link}</a>
+        </p>
+        <p style="color:#697178;font-size:13px;margin-top:20px">
+          Reference: ${esc(app.ref_code)}. Please complete it at the earliest. If you have any questions,
+          simply reply to this email.
+        </p>
+        <p>Warm regards,<br>Recruitment Team, ${esc(app.company_name)}</p>
+      </div>`;
+
+    return await sendMail({
+      to: app.email,
+      subject: `Your AI first-round interview (${app.company_code} · ${app.ref_code})`,
+      html,
+      replyTo: hrReply,
+    });
+  } catch (err) {
+    return { sent: false, reason: err.message };
+  }
+}

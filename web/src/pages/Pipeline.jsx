@@ -106,6 +106,23 @@ export default function Pipeline() {
     }
   };
 
+  // AI recruiter — send the candidate their 5-minute AI first-round interview link.
+  const [interviewing, setInterviewing] = useState(null);
+  const sendInterview = async (a) => {
+    if (a.interview_status && !window.confirm(
+      `Re-send the AI interview link to ${a.full_name}?`
+    )) return;
+    setInterviewing(a.id);
+    try {
+      await api.post(`/applications/${a.id}/send-interview`);
+      await load();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setInterviewing(null);
+    }
+  };
+
   // One-click advance to the next pipeline stage, straight from the list.
   const [proceeding, setProceeding] = useState(null);
   const nextStage = (status) => {
@@ -481,6 +498,7 @@ export default function Pipeline() {
                 <th>Expected</th>
                 <th>Form</th>
                 <th>Status</th>
+                <th>AI interview</th>
                 <th>Applied</th>
                 <th>HR email</th>
                 <th>Actions</th>
@@ -541,6 +559,36 @@ export default function Pipeline() {
                     <span className="chip">{a.stage2_submitted_at ? 'Complete' : 'Pending'}</span>
                   </td>
                   <td><span className={`chip ${a.status}`}>{STATUS_LABEL[a.status]}</span></td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    {a.interview_status === 'DONE' ? (
+                      a.interview_score != null ? (
+                        <span className={`score ${scoreBand(a.interview_score)}`}
+                              title="AI interview score">
+                          {Number(a.interview_score).toFixed(1)}<small>/10</small>
+                        </span>
+                      ) : (
+                        <span className="chip JOINED">Done</span>
+                      )
+                    ) : a.interview_status === 'IN_PROGRESS' ? (
+                      <span className="chip INTERVIEW_SCORE">In progress</span>
+                    ) : a.interview_status === 'INVITED' ? (
+                      <div>
+                        <span className="chip" title="Interview link sent">Invited</span>
+                        <button className="ghost small" style={{ marginTop: 5, display: 'block' }}
+                                disabled={interviewing === a.id}
+                                onClick={() => sendInterview(a)}>
+                          {interviewing === a.id ? 'Sending…' : 'Resend'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="ghost small"
+                              disabled={interviewing === a.id}
+                              title={`Send the 5-minute AI interview link to ${a.full_name}`}
+                              onClick={() => sendInterview(a)}>
+                        {interviewing === a.id ? 'Sending…' : '✨ Send interview'}
+                      </button>
+                    )}
+                  </td>
                   <td className="sub">{date(a.created_at)}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     {a.notify_status === 'SENT' ? (
