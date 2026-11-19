@@ -7,8 +7,12 @@ import { notifyHrOfApplication } from '../services/notify.js';
 import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
+import { tts, stt, sarvamConfigured } from '../services/sarvam.js';
 
 const r = Router();
+
+// Audio clips from the AI interview (one short answer at a time), held in memory for transcription.
+const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
 
 const ALLOWED = [
   'application/pdf',
@@ -232,6 +236,82 @@ r.post('/form/:token', async (req, res) => {
     [app.id]
   );
   res.json({ ok: true });
+});
+
+/* ---------------- AI video interview (first round) ---------------- */
+
+/** Look up an interview by its private token. */
+async function interviewApp(token) {
+  return one(
+    `SELECT a.id, a.full_name, a.email, a.position_applied, a.interview_status,
+            a.interview_transcript, c.name AS company_name
+       FROM applications a JOIN companies c ON c.id = a.company_id
+      WHERE a.interview_token = $1`,
+    [token]
+  );
+}
+
+/** Candidate opens the interview link — basic info + whether it's already done. */
+r.get('/interview/:token', async (req, res) => {
+  const app = await interviewApp(req.params.token);
+  if (!app) return res.status(404).json({ error: 'This interview link is not valid.' });
+  res.json({
+    full_name: app.full_name,
+    position_applied: app.position_applied,
+    company_name: app.company_name,
+    status: app.interview_status || 'PENDING',
+    voice_ready: sarvamConfigured(),
+  });
+});
+
+/** Start (or restart) the interview — greet the candidate and ask for a self-introduction. */
+r.post('/interview/:token/start', async (req, res) => {
+  const app = await interviewApp(req.params.token);
+  if (!app) return res.status(404).json({ error: 'This interview link is not valid.' });
+  if (app.interview_status === 'DONE')
+    return res.status(409).json({ error: 'This interview has already been completed.' });
+
+  const first = (app.full_name || '').trim().split(/\s+/)[0] || 'there';
+  const greeting =
+    `Hello ${first}, and welcome to your first-round interview for the ${app.position_applied} role ` +
+    `at ${app.company_name}. I am your AI interviewer. To begin, please introduce yourself — tell me ` +
+    `about your background and why this role interests you. Please keep each answer under thirty seconds.`;
+
+  const voice = await tts(greeting);
+  if (voice.error) return res.status(502).json({ error: voice.error });
+
+  await q(
+    `UPDATE applications
+        SET interview_status='IN_PROGRESS',
+            interview_started_at = COALESCE(interview_started_at, now()),
+            interview_transcript = $2,
+            updated_at = now()
+      WHERE id=$1`,
+    [app.id, JSON.stringify([{ role: 'ai', text: greeting }])]
+  );
+
+  res.json({ text: greeting, audio: voice.audio, done: false });
+});
+
+/** Candidate submits one spoken answer (<=30s audio). We transcribe it and store it.
+ *  (Increment 1: transcribe + save. The AI follow-up questions and scoring come next.) */
+r.post('/interview/:token/answer', audioUpload.single('audio'), async (req, res) => {
+  const app = await interviewApp(req.params.token);
+  if (!app) return res.status(404).json({ error: 'This interview link is not valid.' });
+  if (!req.file) return res.status(400).json({ error: 'No audio was received.' });
+
+  const out = await stt(req.file.buffer, req.file.originalname || 'answer.webm', req.file.mimetype);
+  if (out.error) return res.status(502).json({ error: out.error });
+
+  const transcript = Array.isArray(app.interview_transcript) ? app.interview_transcript : [];
+  transcript.push({ role: 'candidate', text: out.transcript });
+  await q(`UPDATE applications SET interview_transcript=$2, updated_at=now() WHERE id=$1`,
+          [app.id, JSON.stringify(transcript)]);
+
+  // Increment 1 ends after the introduction so we can confirm the voice pipeline works end to end.
+  const closing = 'Thank you. That completes this first step. Our team will review your response and be in touch.';
+  const voice = await tts(closing);
+  res.json({ transcript: out.transcript, done: true, text: closing, audio: voice.audio || null });
 });
 
 export default r;

@@ -344,6 +344,40 @@ export default function ApplicationDetail() {
         </div>
 
         <div className="stack">
+          {app.interview_token && (
+            <Section title="AI first-round interview">
+              <p style={{ marginTop: 0 }}>
+                An AI-led video interview. Share this link with the candidate, or it is emailed to them automatically
+                when you move them to the <strong>Interview Score</strong> stage.
+              </p>
+              <div className="linkbox">
+                <span style={{ flex: 1 }}>{`${window.location.origin}/interview/${app.interview_token}`}</span>
+                <button className="small ghost"
+                        onClick={() => navigator.clipboard.writeText(`${window.location.origin}/interview/${app.interview_token}`)}>
+                  Copy
+                </button>
+              </div>
+              <div className="row" style={{ marginTop: 10, alignItems: 'center' }}>
+                <a className="ghost small" role="button" target="_blank" rel="noopener noreferrer"
+                   href={`/interview/${app.interview_token}`}
+                   style={{ display: 'inline-block', padding: '7px 13px' }}>
+                  Open interview
+                </a>
+                {app.interview_status && (
+                  <span className="chip" style={{ marginLeft: 4 }}>
+                    {app.interview_status === 'DONE' ? 'Completed'
+                      : app.interview_status === 'IN_PROGRESS' ? 'In progress' : 'Not started'}
+                  </span>
+                )}
+                {app.interview_score != null && (
+                  <span className="chip INTERVIEW_SCORE" style={{ marginLeft: 4 }}>
+                    Score {Number(app.interview_score).toFixed(1)}/10
+                  </span>
+                )}
+              </div>
+            </Section>
+          )}
+
           <Section title="Full application form">
             {app.stage2_submitted_at ? (
               <div className="row">

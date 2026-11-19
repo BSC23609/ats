@@ -42,6 +42,17 @@ export async function migrate() {
        ('APPLIED','ACCEPTED','INTERVIEW_SCORE','OFFICE_INTERVIEW','SELECTED','OFFERED','JOINED','REJECTED','WITHDRAWN','ON_HOLD'))`,
     // One employee record per application, enforced in the database as well as in code.
     `CREATE UNIQUE INDEX IF NOT EXISTS uniq_employee_application ON employees(application_id) WHERE application_id IS NOT NULL`,
+    // AI video interview (first round). Every application gets a private interview link token.
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_token TEXT DEFAULT encode(gen_random_bytes(16),'hex')`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_status TEXT`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_transcript JSONB`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_score NUMERIC(4,1)`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_result JSONB`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_recording_path TEXT`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_started_at TIMESTAMPTZ`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_completed_at TIMESTAMPTZ`,
+    `UPDATE applications SET interview_token = encode(gen_random_bytes(16),'hex') WHERE interview_token IS NULL`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS uniq_application_interview_token ON applications(interview_token)`,
     `CREATE TABLE IF NOT EXISTS password_otps (
        id SERIAL PRIMARY KEY,
        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
