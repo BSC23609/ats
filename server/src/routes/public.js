@@ -83,6 +83,23 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
     const company = await one('SELECT * FROM companies WHERE id=$1 AND active', [b.company_id]);
     if (!company) return res.status(400).json({ error: 'That company is not accepting applications.' });
 
+    // Stop the same person piling up duplicate applications for the same role. When the apply
+    // came from a specific opening we match on the job; otherwise on company + role title.
+    const email = b.email.trim().toLowerCase();
+    const jobId = b.job_id && !Number.isNaN(Number(b.job_id)) ? Number(b.job_id) : null;
+    const dup = await one(
+      `SELECT ref_code FROM applications
+         WHERE lower(email) = $1
+           AND ($2::int IS NULL OR job_id = $2)
+           AND ($2::int IS NOT NULL OR (company_id = $3 AND lower(position_applied) = lower($4)))
+         LIMIT 1`,
+      [email, jobId, company.id, b.position_applied.trim()]
+    );
+    if (dup)
+      return res.status(409).json({
+        error: `You have already applied for this role (reference ${dup.ref_code}). Our team already has your application — there is no need to apply again.`,
+      });
+
     // Reserve the id first so the resume can be filed under its reference code, then store the
     // file before the row exists — a failed upload should never leave a half-made application.
     const seq = await one(`SELECT nextval('applications_id_seq')::int AS n`);

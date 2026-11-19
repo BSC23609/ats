@@ -33,6 +33,15 @@ export async function migrate() {
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS notify_status TEXT`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS notify_at TIMESTAMPTZ`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS notify_error TEXT`,
+    // New pipeline stages (Nov 2026). Map old codes to the new ones, then swap the CHECK
+    // constraint. All idempotent: after the first run the UPDATEs touch nothing.
+    `UPDATE applications SET status='ACCEPTED'         WHERE status='SHORTLISTED'`,
+    `UPDATE applications SET status='OFFICE_INTERVIEW' WHERE status='INTERVIEW'`,
+    `ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_status_check`,
+    `ALTER TABLE applications ADD CONSTRAINT applications_status_check CHECK (status IN
+       ('APPLIED','ACCEPTED','INTERVIEW_SCORE','OFFICE_INTERVIEW','SELECTED','OFFERED','JOINED','REJECTED','WITHDRAWN','ON_HOLD'))`,
+    // One employee record per application, enforced in the database as well as in code.
+    `CREATE UNIQUE INDEX IF NOT EXISTS uniq_employee_application ON employees(application_id) WHERE application_id IS NOT NULL`,
     `CREATE TABLE IF NOT EXISTS password_otps (
        id SERIAL PRIMARY KEY,
        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

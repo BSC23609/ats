@@ -78,8 +78,8 @@ CREATE TABLE jobs (
 CREATE INDEX ON jobs (company_id, status);
 
 -- Pipeline stages
--- APPLIED -> SHORTLISTED -> INTERVIEW -> SELECTED -> OFFERED -> JOINED
--- terminal: REJECTED | ON_HOLD | WITHDRAWN
+-- APPLIED -> ACCEPTED -> INTERVIEW_SCORE -> OFFICE_INTERVIEW -> SELECTED -> OFFERED -> JOINED
+-- terminal: REJECTED | WITHDRAWN | ON_HOLD
 CREATE TABLE applications (
   id                 SERIAL PRIMARY KEY,
   ref_code           TEXT UNIQUE NOT NULL,          -- BSC-2607-0134
@@ -117,7 +117,7 @@ CREATE TABLE applications (
   details            JSONB,                          -- entire printed form (see web/src/pages/FullForm.jsx)
 
   status             TEXT NOT NULL DEFAULT 'APPLIED'
-                     CHECK (status IN ('APPLIED','SHORTLISTED','INTERVIEW','SELECTED','OFFERED','JOINED','REJECTED','ON_HOLD','WITHDRAWN')),
+                     CHECK (status IN ('APPLIED','ACCEPTED','INTERVIEW_SCORE','OFFICE_INTERVIEW','SELECTED','OFFERED','JOINED','REJECTED','WITHDRAWN','ON_HOLD')),
   status_note        TEXT,
   interview_at       TIMESTAMPTZ,
   offered_ctc        NUMERIC(12,2),

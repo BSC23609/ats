@@ -383,7 +383,7 @@ export default function ApplicationDetail() {
                 </select>
               </div>
 
-              {move.status === 'INTERVIEW' && (
+              {(move.status === 'INTERVIEW_SCORE' || move.status === 'OFFICE_INTERVIEW') && (
                 <div className="field">
                   <label htmlFor="interview_at">Interview date and time</label>
                   <input id="interview_at" type="datetime-local" value={move.interview_at}

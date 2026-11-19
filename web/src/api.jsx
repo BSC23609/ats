@@ -119,11 +119,14 @@ export function AuthProvider({ children }) {
 }
 
 /* ---------- shared formatting ---------- */
-export const PIPELINE = ['APPLIED', 'SHORTLISTED', 'INTERVIEW', 'SELECTED', 'OFFERED', 'JOINED'];
-export const CLOSED = ['REJECTED', 'ON_HOLD', 'WITHDRAWN'];
+export const PIPELINE = ['APPLIED', 'ACCEPTED', 'INTERVIEW_SCORE', 'OFFICE_INTERVIEW', 'SELECTED', 'OFFERED', 'JOINED'];
+export const CLOSED = ['REJECTED', 'WITHDRAWN', 'ON_HOLD'];
 export const STATUS_LABEL = {
-  APPLIED: 'Applied', SHORTLISTED: 'Shortlisted', INTERVIEW: 'Interview', SELECTED: 'Selected',
-  OFFERED: 'Offered', JOINED: 'Joined', REJECTED: 'Rejected', ON_HOLD: 'On hold', WITHDRAWN: 'Withdrawn',
+  APPLIED: 'Applied', ACCEPTED: 'Accepted', INTERVIEW_SCORE: 'Interview Score',
+  OFFICE_INTERVIEW: 'Office Interview', SELECTED: 'Selected', OFFERED: 'Offered', JOINED: 'Joined',
+  REJECTED: 'Rejected', WITHDRAWN: 'Withdrawn', ON_HOLD: 'On hold',
+  // legacy codes kept so old rows still render if any remain
+  SHORTLISTED: 'Accepted', INTERVIEW: 'Office Interview',
 };
 
 /** Score bands. Deliberately coarse — the number is a sorting aid, not a verdict. */

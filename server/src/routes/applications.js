@@ -13,8 +13,8 @@ import { askRecruiter } from '../services/recruiter.js';
 const r = Router();
 r.use(requireAuth);
 
-const PIPELINE = ['APPLIED', 'SHORTLISTED', 'INTERVIEW', 'SELECTED', 'OFFERED', 'JOINED'];
-const CLOSED = ['REJECTED', 'ON_HOLD', 'WITHDRAWN'];
+const PIPELINE = ['APPLIED', 'ACCEPTED', 'INTERVIEW_SCORE', 'OFFICE_INTERVIEW', 'SELECTED', 'OFFERED', 'JOINED'];
+const CLOSED = ['REJECTED', 'WITHDRAWN', 'ON_HOLD'];
 
 /** Board counts for the dashboard. */
 r.get('/stats', async (req, res) => {
@@ -243,6 +243,10 @@ r.post('/:id/status', async (req, res) => {
   if (!app) return res.status(404).json({ error: 'Application not found.' });
   if (!assertCompanyAccess(req, res, app.company_id)) return;
 
+  // Already on this status — do nothing, so re-selecting it can't add a duplicate history row,
+  // a second employee record, or a repeat email.
+  if (status === app.status) return res.json({ ok: true, unchanged: true });
+
   if (status === 'JOINED' && !app.stage2_submitted_at)
     return res.status(400).json({
       error: 'The candidate has not submitted the full application form yet. Send them the form link first.',
@@ -308,10 +312,10 @@ r.post('/:id/status', async (req, res) => {
 
   res.json({ ok: true, employee: result });
 
-  // Moving a candidate to Interview emails THEM their full-application-form link, with the
+  // Moving a candidate to Office Interview emails THEM their full-application-form link, with the
   // interview date HR just set. Fire-and-forget — a slow mail send must not fail the HR click,
   // and a bad candidate address is logged, not surfaced.
-  if (status === 'INTERVIEW') {
+  if (status === 'OFFICE_INTERVIEW') {
     emailInterviewForm(app.id)
       .then((out) => { if (!out.sent) console.error('interview email not sent:', out.reason); })
       .catch((e) => console.error('interview email error:', e.message));

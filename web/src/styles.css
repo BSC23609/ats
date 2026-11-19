@@ -213,9 +213,10 @@ td.co { border-left: 3px solid var(--line); }   /* the company rail — the only
   border: 1px solid var(--line); color: var(--muted); background: #fafbfa;
 }
 /* early stages are quiet — they carry no news */
-.chip.APPLIED, .chip.SHORTLISTED { background: #f3f4f3; color: var(--ink-soft); border-color: var(--line); }
+.chip.APPLIED { background: #f3f4f3; color: var(--ink-soft); border-color: var(--line); }
+.chip.ACCEPTED, .chip.SHORTLISTED { background: #eef4fb; color: var(--blue); border-color: #cfe0f3; }
 /* the live ones earn ink */
-.chip.INTERVIEW { background: var(--blue); color: #fff; border-color: var(--blue); }
+.chip.INTERVIEW, .chip.INTERVIEW_SCORE, .chip.OFFICE_INTERVIEW { background: var(--blue); color: #fff; border-color: var(--blue); }
 .chip.SELECTED, .chip.OFFERED { background: #eaf3ef; color: var(--green); border-color: #bcd9cd; }
 .chip.JOINED { background: var(--green); color: #fff; border-color: var(--green); }
 .chip.REJECTED, .chip.WITHDRAWN { background: #f9ecec; color: var(--red); border-color: #e3c4c3; }
