@@ -3,6 +3,18 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, useAuth, PIPELINE, CLOSED, STATUS_LABEL, money, date, scoreBand } from '../api.jsx';
 import ResumeViewer from '../components/ResumeViewer.jsx';
 
+// Turn a long AI/resume error into a short label (full text stays in the tooltip).
+function shortAiError(msg) {
+  const m = (msg || '').toLowerCase();
+  if (!m) return 'Could not read the resume';
+  if (m.includes('quota') || m.includes('rate') || m.includes('billing')) return 'AI quota reached — retry later';
+  if (m.includes('high demand') || m.includes('overload') || m.includes('503') || m.includes('unavailable')) return 'AI busy — retry';
+  if (m.includes('no readable text') || m.includes('scanned') || m.includes('image-only')) return 'Scanned/image PDF — no text';
+  if (m.includes('utf8') || m.includes('byte sequence') || m.includes('encoding')) return 'Resume text could not be read';
+  if (m.includes('api key') || m.includes('permission') || m.includes('denied')) return 'AI not configured';
+  return 'Could not score — retry';
+}
+
 // Common reasons offered when closing a candidate out — recorded on the application and its history.
 const REJECT_REASONS = [
   'Salary expectation too high',
@@ -626,7 +638,7 @@ export default function Pipeline() {
                       <span className="sub">Reading resume…</span>
                     ) : a.ai_status === 'FAILED' ? (
                       <span className="sub" title={a.ai_error || ''}>
-                        {a.ai_error || 'Could not read the resume'}
+                        {shortAiError(a.ai_error)}
                       </span>
                     ) : a.resume_filename ? (
                       <span className="sub">Not scored yet</span>
