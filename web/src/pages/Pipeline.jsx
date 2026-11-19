@@ -139,6 +139,20 @@ export default function Pipeline() {
     }
   };
 
+  // Close a candidate out of the pipeline — Reject or Withdraw — from the list.
+  const moveTo = async (a, status, confirmMsg) => {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    setProceeding(a.id);
+    try {
+      await api.post(`/applications/${a.id}/status`, { status });
+      await load();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setProceeding(null);
+    }
+  };
+
   // Open the "Add candidate" dialog: reset the form, preselect the one company if there's only one,
   // and load the open roles so HR can attach the application to a posting.
   const openAdd = async () => {
@@ -463,7 +477,7 @@ export default function Pipeline() {
                 <th>Status</th>
                 <th>Applied</th>
                 <th>HR email</th>
-                <th>Proceed</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -553,15 +567,31 @@ export default function Pipeline() {
                     </button>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    {nextStage(a.status) ? (
-                      <button className="ghost small"
-                              disabled={proceeding === a.id}
-                              title={`Move ${a.full_name} to ${STATUS_LABEL[nextStage(a.status)]}`}
-                              onClick={() => proceed(a)}>
-                        {proceeding === a.id ? 'Moving…' : `→ ${STATUS_LABEL[nextStage(a.status)]}`}
-                      </button>
+                    {CLOSED.includes(a.status) ? (
+                      <span className="sub">{STATUS_LABEL[a.status]}</span>
                     ) : (
-                      <span className="sub">—</span>
+                      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                        {nextStage(a.status) && (
+                          <button className="ghost small"
+                                  disabled={proceeding === a.id}
+                                  title={`Move ${a.full_name} to ${STATUS_LABEL[nextStage(a.status)]}`}
+                                  onClick={() => proceed(a)}>
+                            {proceeding === a.id ? 'Moving…' : `→ ${STATUS_LABEL[nextStage(a.status)]}`}
+                          </button>
+                        )}
+                        <button className="ghost small" style={{ color: '#c0392b' }}
+                                disabled={proceeding === a.id}
+                                title={`Reject ${a.full_name}`}
+                                onClick={() => moveTo(a, 'REJECTED', `Reject ${a.full_name} (${a.ref_code})?`)}>
+                          Reject
+                        </button>
+                        <button className="ghost small"
+                                disabled={proceeding === a.id}
+                                title={`Mark ${a.full_name} as withdrawn`}
+                                onClick={() => moveTo(a, 'WITHDRAWN', `Mark ${a.full_name} (${a.ref_code}) as withdrawn?`)}>
+                          Withdraw
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
