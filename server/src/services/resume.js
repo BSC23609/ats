@@ -1,5 +1,7 @@
-import { q } from '../db.js';
+import { one, q } from '../db.js';
 import { claudeJSON, claudeConfigured, claudeExtractPdfText, claudeExtractImageText } from './claude.js';
+import { getFile } from './storage.js';
+import { toText, describeRange } from './html.js';
 
 /** Pull plain text out of a resume buffer, robustly, and tell the caller WHY if it can't. */
 export async function extractText(buffer, mimetype = '', filename = '') {
@@ -207,5 +209,75 @@ export async function summariseResume(
     console.error(`resume summary failed for application ${applicationId}:`, err.message);
     await q(`UPDATE applications SET ai_status='FAILED', ai_error=$2 WHERE id=$1`,
             [applicationId, err.message.slice(0, 300)]);
+  }
+}
+
+// Transient failures (no credit, overloaded, rate-limited, network) should keep being retried once
+// the account is funded; genuinely unscoreable resumes should eventually stop. This tells them apart.
+const TRANSIENT_ERR = /credit|billing|overload|rate|429|529|HTTP 5|unavailable|timeout|ECONN|network|fetch failed|quota/i;
+
+/** Re-run scoring for one application, re-extracting the resume text from storage if needed. Throws. */
+export async function rescoreApplication(appId) {
+  const app = await one(
+    `SELECT a.*, c.name AS company_name FROM applications a JOIN companies c ON c.id=a.company_id WHERE a.id=$1`,
+    [appId]
+  );
+  if (!app) return;
+  const job = app.job_id
+    ? await one('SELECT jd_text, description, min_experience, max_experience, location FROM jobs WHERE id=$1', [app.job_id])
+    : null;
+
+  let text = app.resume_text;
+  if (!text && app.resume_path) {
+    const buffer = await getFile(app.resume_path);
+    text = await extractText(buffer, '', app.resume_filename || '');
+    await q('UPDATE applications SET resume_text=$1 WHERE id=$2', [text, appId]);
+  }
+  await summariseResume(appId, {
+    resumeText: text,
+    position: app.position_applied,
+    company: app.company_name,
+    experience: app.total_experience,
+    jobDescription: job?.jd_text || toText(job?.description),
+    experienceRange: describeRange(job?.min_experience, job?.max_experience),
+    jobLocation: job?.location,
+    candidateLocation: [app.area, app.city, app.pincode].map((x) => (x || '').trim()).filter(Boolean).join(', ') || app.current_location,
+  });
+}
+
+/**
+ * Background sweep: automatically re-score FAILED resumes so transient problems (a busy API, or a
+ * key that was briefly out of credit) heal themselves without anyone clicking Retry. Capped per run,
+ * and each row is only retried a limited number of times for NON-transient failures, so a genuinely
+ * unreadable resume can't loop forever and burn credit.
+ */
+export async function rescoreFailed(limit = 6) {
+  if (!claudeConfigured()) return;
+  let rows = [];
+  try {
+    ({ rows } = await q(
+      `SELECT id FROM applications
+         WHERE ai_status = 'FAILED' AND resume_path IS NOT NULL AND COALESCE(ai_attempts, 0) < 8
+         ORDER BY updated_at ASC NULLS FIRST
+         LIMIT $1`,
+      [limit]
+    ));
+  } catch (err) {
+    console.error('rescoreFailed query error:', err.message);
+    return;
+  }
+
+  for (const r of rows) {
+    try {
+      await rescoreApplication(r.id);
+    } catch (err) {
+      await q(`UPDATE applications SET ai_status='FAILED', ai_error=$2 WHERE id=$1`,
+              [r.id, (err.message || 'failed').slice(0, 300)]).catch(() => {});
+    }
+    // Only count the attempt for permanent failures; transient ones stay eligible for next time.
+    const row = await one(`SELECT ai_status, ai_error FROM applications WHERE id=$1`, [r.id]).catch(() => null);
+    if (row && row.ai_status === 'FAILED' && !TRANSIENT_ERR.test(row.ai_error || '')) {
+      await q(`UPDATE applications SET ai_attempts = COALESCE(ai_attempts, 0) + 1 WHERE id=$1`, [r.id]).catch(() => {});
+    }
   }
 }
