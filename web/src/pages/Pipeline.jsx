@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, useAuth, PIPELINE, CLOSED, STATUS_LABEL, money, date, scoreBand } from '../api.jsx';
 import ResumeViewer from '../components/ResumeViewer.jsx';
@@ -35,6 +35,19 @@ export default function Pipeline() {
   const [aiAnswer, setAiAnswer] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiErr, setAiErr] = useState('');
+
+  // "Add candidate" — HR enters someone who applied off-portal.
+  const emptyAdd = {
+    company_id: '', job_id: '', position_applied: '', full_name: '', email: '', phone: '',
+    total_experience: '', current_ctc: '', expected_ctc: '', notice_period_days: '',
+    area: '', city: '', pincode: '', status: 'APPLIED',
+  };
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState(emptyAdd);
+  const [addJobs, setAddJobs] = useState([]);
+  const [addBusy, setAddBusy] = useState(false);
+  const [addErr, setAddErr] = useState('');
+  const resumeRef = useRef(null);
 
   const scope = company ? `company=${company}` : '';
 
@@ -126,6 +139,52 @@ export default function Pipeline() {
     }
   };
 
+  // Open the "Add candidate" dialog: reset the form, preselect the one company if there's only one,
+  // and load the open roles so HR can attach the application to a posting.
+  const openAdd = async () => {
+    setAddErr('');
+    setAddForm({ ...emptyAdd, company_id: company || (companies.length === 1 ? String(companies[0].id) : '') });
+    setAddOpen(true);
+    if (resumeRef.current) resumeRef.current.value = '';
+    try {
+      const js = await api.get('/jobs?status=OPEN');
+      setAddJobs(Array.isArray(js) ? js : (js.rows || []));
+    } catch {
+      setAddJobs([]);
+    }
+  };
+
+  // Picking an open role fills the role title, job link and company in one step.
+  const pickJob = (jobId) => {
+    const j = addJobs.find((x) => String(x.id) === String(jobId));
+    setAddForm((f) => ({
+      ...f,
+      job_id: jobId || '',
+      position_applied: j ? j.title : f.position_applied,
+      company_id: j ? String(j.company_id) : f.company_id,
+    }));
+  };
+
+  const submitAdd = async (e) => {
+    e.preventDefault();
+    if (addBusy) return;
+    setAddBusy(true); setAddErr('');
+    try {
+      const fd = new FormData();
+      Object.entries(addForm).forEach(([k, v]) => { if (v !== '' && v != null) fd.append(k, v); });
+      const file = resumeRef.current?.files?.[0];
+      if (file) fd.append('resume', file);
+      const res = await api.upload('/applications', fd);
+      setAddOpen(false);
+      await load();
+      navigate(`/applications/${res.id}`);
+    } catch (err) {
+      setAddErr(err.message);
+    } finally {
+      setAddBusy(false);
+    }
+  };
+
   // Permanently delete the whole candidate row from the pipeline.
   const deleteRow = async (a) => {
     if (!window.confirm(
@@ -177,6 +236,10 @@ export default function Pipeline() {
                   title="Ask the AI recruiter about the candidates currently in view">
             ✨ AI recruiter
           </button>
+          <button className="primary" onClick={openAdd}
+                  title="Add a candidate who applied off-portal (walk-in, referral, email)">
+            + Add candidate
+          </button>
         </div>
       </div>
 
@@ -223,6 +286,126 @@ export default function Pipeline() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {addOpen && (
+        <div className="overlay" onClick={(e) => e.target === e.currentTarget && setAddOpen(false)}>
+          <form className="dialog" style={{ maxWidth: 680 }} role="dialog" aria-modal="true" onSubmit={submitAdd}>
+            <div className="dialog-head">
+              <div>
+                <div className="eyebrow">Pipeline</div>
+                <h2>Add a candidate</h2>
+                <div className="sub">
+                  For someone who applied off-portal — a walk-in, referral or emailed CV. No email is sent;
+                  the resume (if attached) is scored automatically.
+                </div>
+              </div>
+              <button type="button" className="dialog-close" onClick={() => setAddOpen(false)} aria-label="Close">×</button>
+            </div>
+
+            <div className="dialog-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {addJobs.length > 0 && (
+                <label style={{ gridColumn: '1 / -1' }}>
+                  <span>Open role (optional — links the application to a posting)</span>
+                  <select value={addForm.job_id} onChange={(e) => pickJob(e.target.value)}>
+                    <option value="">Not linked to a posting</option>
+                    {addJobs.map((j) => (
+                      <option key={j.id} value={j.id}>{j.company_code ? `${j.company_code} — ` : ''}{j.title}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <label>
+                <span>Company *</span>
+                <select required value={addForm.company_id}
+                        onChange={(e) => setAddForm((f) => ({ ...f, company_id: e.target.value }))}>
+                  <option value="">Select company…</option>
+                  {companies.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Role / position *</span>
+                <input required value={addForm.position_applied}
+                       onChange={(e) => setAddForm((f) => ({ ...f, position_applied: e.target.value }))}
+                       placeholder="e.g. Site Engineer" />
+              </label>
+
+              <label>
+                <span>Full name *</span>
+                <input required value={addForm.full_name}
+                       onChange={(e) => setAddForm((f) => ({ ...f, full_name: e.target.value }))} />
+              </label>
+              <label>
+                <span>Phone *</span>
+                <input required value={addForm.phone}
+                       onChange={(e) => setAddForm((f) => ({ ...f, phone: e.target.value }))} />
+              </label>
+              <label style={{ gridColumn: '1 / -1' }}>
+                <span>Email *</span>
+                <input required type="email" value={addForm.email}
+                       onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))} />
+              </label>
+
+              <label>
+                <span>Experience (years)</span>
+                <input type="number" min="0" step="0.5" value={addForm.total_experience}
+                       onChange={(e) => setAddForm((f) => ({ ...f, total_experience: e.target.value }))} />
+              </label>
+              <label>
+                <span>Notice period (days)</span>
+                <input type="number" min="0" value={addForm.notice_period_days}
+                       onChange={(e) => setAddForm((f) => ({ ...f, notice_period_days: e.target.value }))} />
+              </label>
+              <label>
+                <span>Current CTC (₹/yr)</span>
+                <input type="number" min="0" value={addForm.current_ctc}
+                       onChange={(e) => setAddForm((f) => ({ ...f, current_ctc: e.target.value }))} />
+              </label>
+              <label>
+                <span>Expected CTC (₹/yr)</span>
+                <input type="number" min="0" value={addForm.expected_ctc}
+                       onChange={(e) => setAddForm((f) => ({ ...f, expected_ctc: e.target.value }))} />
+              </label>
+
+              <label>
+                <span>City</span>
+                <input value={addForm.city}
+                       onChange={(e) => setAddForm((f) => ({ ...f, city: e.target.value }))} />
+              </label>
+              <label>
+                <span>Pincode</span>
+                <input value={addForm.pincode}
+                       onChange={(e) => setAddForm((f) => ({ ...f, pincode: e.target.value }))} />
+              </label>
+
+              <label style={{ gridColumn: '1 / -1' }}>
+                <span>Resume (optional — PDF or Word)</span>
+                <input type="file" ref={resumeRef} accept=".pdf,.doc,.docx,.txt" />
+              </label>
+
+              <label style={{ gridColumn: '1 / -1' }}>
+                <span>Starting stage</span>
+                <select value={addForm.status}
+                        onChange={(e) => setAddForm((f) => ({ ...f, status: e.target.value }))}>
+                  {PIPELINE.filter((s) => s !== 'JOINED').map((s) => (
+                    <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                  ))}
+                  {CLOSED.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+                </select>
+              </label>
+
+              {addErr && <div className="error" style={{ gridColumn: '1 / -1' }}>{addErr}</div>}
+            </div>
+
+            <div className="dialog-foot">
+              <button type="button" className="ghost" onClick={() => setAddOpen(false)}>Cancel</button>
+              <button type="submit" className="primary" disabled={addBusy}>
+                {addBusy ? 'Adding…' : 'Add candidate'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

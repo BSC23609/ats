@@ -16,6 +16,105 @@ r.use(requireAuth);
 const PIPELINE = ['APPLIED', 'ACCEPTED', 'INTERVIEW_SCORE', 'OFFICE_INTERVIEW', 'SELECTED', 'OFFERED', 'JOINED'];
 const CLOSED = ['REJECTED', 'WITHDRAWN', 'ON_HOLD'];
 
+// Resume upload for an HR-entered candidate (optional).
+const resumeUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+
+/** HR adds a candidate by hand (someone who applied off-portal). Mirrors the careers apply, but
+ *  authenticated, lets HR set the starting stage, and does not email anyone on creation. */
+r.post('/', resumeUpload.single('resume'), async (req, res) => {
+  try {
+    const b = req.body;
+    const companyId = Number(b.company_id);
+    if (!companyId || !b.full_name || !b.email || !b.phone || !b.position_applied)
+      return res.status(400).json({ error: 'Name, email, phone, company and role are required.' });
+    if (!assertCompanyAccess(req, res, companyId)) return;
+
+    const company = await one('SELECT * FROM companies WHERE id=$1 AND active', [companyId]);
+    if (!company) return res.status(400).json({ error: 'That company is not available.' });
+
+    const status = b.status && [...PIPELINE, ...CLOSED].includes(b.status) ? b.status : 'APPLIED';
+
+    const email = b.email.trim().toLowerCase();
+    const jobId = b.job_id && !Number.isNaN(Number(b.job_id)) ? Number(b.job_id) : null;
+    const dup = await one(
+      `SELECT ref_code FROM applications
+         WHERE lower(email) = $1
+           AND ($2::int IS NULL OR job_id = $2)
+           AND ($2::int IS NOT NULL OR (company_id = $3 AND lower(position_applied) = lower($4)))
+         LIMIT 1`,
+      [email, jobId, companyId, b.position_applied.trim()]
+    );
+    if (dup) return res.status(409).json({ error: `A candidate with this email is already in the pipeline for this role (${dup.ref_code}).` });
+
+    const seq = await one(`SELECT nextval('applications_id_seq')::int AS n`);
+    const yymm = new Date().toISOString().slice(2, 7).replace('-', '');
+    const ref = `${company.code}-${yymm}-${String(seq.n).padStart(4, '0')}`;
+
+    let resumeKey = null;
+    if (req.file) {
+      const m = (req.file.originalname || '').match(/\.[a-z0-9]+$/i);
+      const ext = m ? m[0] : '.pdf';
+      const folder = `${company.code}/${safeName(b.position_applied)}/${safeName(b.full_name)}_${seq.n}`;
+      resumeKey = `${folder}/resume${ext}`;
+      await putFile(resumeKey, req.file.buffer, req.file.mimetype);
+    }
+
+    const app = await tx(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO applications
+           (id, ref_code, company_id, job_id, full_name, email, phone, position_applied,
+            current_location, area, city, pincode,
+            total_experience, current_ctc, expected_ctc, notice_period_days, source,
+            resume_path, resume_filename, ai_status, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+         RETURNING *`,
+        [
+          seq.n, ref, companyId, jobId, b.full_name.trim(), email, b.phone.trim(), b.position_applied.trim(),
+          [b.area, b.city, b.pincode].map((x) => (x || '').trim()).filter(Boolean).join(', ') || null,
+          (b.area || '').trim() || null, (b.city || '').trim() || null, (b.pincode || '').trim() || null,
+          b.total_experience || 0, b.current_ctc || null, b.expected_ctc || null, b.notice_period_days || null,
+          'manual', resumeKey, req.file?.originalname || null, req.file ? 'PENDING' : 'SKIPPED', status,
+        ]
+      );
+      const created = rows[0];
+      await client.query(
+        `INSERT INTO status_history (application_id, from_status, to_status, note, changed_by)
+         VALUES ($1, NULL, $2, 'Added by HR', $3)`,
+        [created.id, status, req.user.id]
+      );
+      return created;
+    });
+
+    res.status(201).json({ id: app.id, ref_code: app.ref_code });
+
+    // Read + score the resume in the background, same as a careers application.
+    if (req.file) {
+      (async () => {
+        try {
+          const text = await extractText(req.file.buffer, req.file.mimetype, req.file.originalname);
+          await q('UPDATE applications SET resume_text=$1 WHERE id=$2', [text, app.id]);
+          const job = app.job_id
+            ? await one('SELECT jd_text, description, min_experience, max_experience FROM jobs WHERE id=$1', [app.job_id])
+            : null;
+          await summariseResume(app.id, {
+            resumeText: text,
+            position: app.position_applied,
+            company: company.name,
+            experience: app.total_experience,
+            jobDescription: job?.jd_text || toText(job?.description),
+            experienceRange: describeRange(job?.min_experience, job?.max_experience),
+          });
+        } catch (err) {
+          await q(`UPDATE applications SET ai_status='FAILED', ai_error=$2 WHERE id=$1`,
+                  [app.id, err.message.slice(0, 300)]);
+        }
+      })();
+    }
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 /** Board counts for the dashboard. */
 r.get('/stats', async (req, res) => {
   const company = companyFilter(req);
