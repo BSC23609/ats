@@ -445,6 +445,22 @@ r.post('/:id/status', async (req, res) => {
       .catch((e) => console.error('interview email error:', e.message));
   }
 
+  // Moving a candidate to the Interview Score stage automatically sends them the AI first-round
+  // interview link and marks it invited. Fire-and-forget, same as above.
+  if (status === 'INTERVIEW_SCORE') {
+    emailAiInterview(app.id)
+      .then((out) => {
+        if (out.sent) {
+          q(`UPDATE applications SET interview_status='INVITED', updated_at=now()
+               WHERE id=$1 AND (interview_status IS NULL OR interview_status NOT IN ('IN_PROGRESS','DONE'))`,
+            [app.id]).catch((e) => console.error('interview_status update error:', e.message));
+        } else {
+          console.error('AI interview email not sent:', out.reason);
+        }
+      })
+      .catch((e) => console.error('AI interview email error:', e.message));
+  }
+
   // A new employee record means the master workbook is out of date. Fire-and-forget:
   // OneDrive being slow must not make the HR admin's click fail.
   if (status === 'JOINED') syncWorkbook();
