@@ -1,4 +1,5 @@
 import { q } from '../db.js';
+import { claudeJSON, claudeConfigured, claudeExtractPdfText, claudeExtractImageText } from './claude.js';
 
 /** Pull plain text out of a resume buffer, robustly, and tell the caller WHY if it can't. */
 export async function extractText(buffer, mimetype = '', filename = '') {
@@ -7,6 +8,7 @@ export async function extractText(buffer, mimetype = '', filename = '') {
                 (buffer && buffer.slice(0, 5).toString('latin1') === '%PDF-'); // sniff the magic bytes
   const isDocx = mimetype.includes('word') || mimetype.includes('officedocument') || name.endsWith('.docx');
   const isDoc = name.endsWith('.doc') && !name.endsWith('.docx');
+  const isImage = mimetype.includes('image') || /\.(png|jpe?g|webp|gif|bmp|tiff?)$/.test(name);
 
   if (isDoc) {
     // Old binary .doc has no reliable pure-JS parser; ask for a PDF or DOCX instead.
@@ -33,13 +35,43 @@ export async function extractText(buffer, mimetype = '', filename = '') {
     }
     text = text.trim();
 
-    if (!text) {
-      // A scanned/photographed resume is an image with no text layer. Nothing to extract.
-      const e = new Error('This PDF has no readable text — it looks scanned or image-only. Ask for a text PDF.');
-      e.code = 'NO_TEXT';
-      throw e;
+    // A scanned/photographed resume has little or no text layer — OCR it with Claude's document reading.
+    if (text.length < 40) {
+      if (claudeConfigured()) {
+        try {
+          const ocr = (await claudeExtractPdfText(buffer)).trim();
+          if (ocr) return ocr;
+        } catch (err) {
+          console.error('PDF OCR failed:', err.message);
+        }
+      }
+      if (!text) {
+        const e = new Error('This PDF has no readable text — it looks scanned or image-only. Ask for a text PDF.');
+        e.code = 'NO_TEXT';
+        throw e;
+      }
     }
     return text;
+  }
+
+  if (isImage) {
+    // An image resume (photo/screenshot) — read it with Claude's vision OCR.
+    if (claudeConfigured()) {
+      try {
+        const mt = mimetype && mimetype.includes('image') ? mimetype
+          : name.endsWith('.png') ? 'image/png'
+          : /\.jpe?g$/.test(name) ? 'image/jpeg'
+          : name.endsWith('.webp') ? 'image/webp'
+          : name.endsWith('.gif') ? 'image/gif' : 'image/png';
+        const ocr = (await claudeExtractImageText(buffer, mt)).trim();
+        if (ocr) return ocr;
+      } catch (err) {
+        console.error('Image OCR failed:', err.message);
+      }
+    }
+    const e = new Error('This image resume could not be read. Ask for a text PDF or Word file.');
+    e.code = 'NO_TEXT';
+    throw e;
   }
 
   if (isDocx) {
@@ -128,12 +160,9 @@ Reply with a SINGLE JSON object and nothing else — no prose, no markdown fence
   "questions_to_ask": [string]
 }`;
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.7-flash';
-
 /**
- * Score a resume with Google Gemini (free tier). Fire-and-forget: writes the result back to the
- * application row and never throws into the request path. The JSON contract is unchanged from the
- * previous scorer, plus the new experience_/location_ fit fields — so the pipeline, badges and
+ * Score a resume with Claude. Fire-and-forget: writes the result back to the application row and
+ * never throws into the request path. The JSON contract is unchanged — so the pipeline, badges and
  * detail page keep working.
  */
 export async function summariseResume(
@@ -149,8 +178,7 @@ export async function summariseResume(
     candidateLocation,
   }
 ) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key || !resumeText?.trim()) {
+  if (!claudeConfigured() || !resumeText?.trim()) {
     await q(`UPDATE applications SET ai_status='SKIPPED' WHERE id=$1`, [applicationId]);
     return;
   }
@@ -170,36 +198,7 @@ export async function summariseResume(
     `\n\nRESUME\n------\n${resumeText.slice(0, 60000)}`;
 
   try {
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        // The instructions go in as a system instruction; the data as the user turn.
-        systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 2048,
-          responseMimeType: 'application/json', // Gemini returns clean JSON, no fences to strip
-        },
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      const why = data?.error?.message || `HTTP ${res.status}`;
-      throw new Error(`Gemini: ${why}`);
-    }
-
-    const raw = (data?.candidates?.[0]?.content?.parts || [])
-      .map((p) => p.text || '')
-      .join('')
-      .replace(/```json|```/g, '')
-      .trim();
-
-    const summary = JSON.parse(raw);
+    const summary = await claudeJSON(INSTRUCTIONS, prompt, 2048);
     await q(`UPDATE applications SET ai_summary=$1, ai_status='DONE', updated_at=now() WHERE id=$2`, [
       summary,
       applicationId,

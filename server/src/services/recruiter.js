@@ -1,8 +1,8 @@
-// AI recruiter — answers an HR question across a set of pipeline candidates, using the same
-// Google Gemini key and model that already power resume scoring. It reads only the candidate
-// summaries it is given, never the live database, and it advises only (it moves/sends nothing).
+// AI recruiter — answers an HR question across a set of pipeline candidates with Claude. It reads
+// only the candidate summaries it is given, never the live database, and it advises only (it
+// moves/sends nothing).
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.7-flash';
+import { claudeText, claudeConfigured } from './claude.js';
 
 const INSTRUCTIONS =
   `You are an AI recruiting assistant for an HR team at an industrial company. You are given a list ` +
@@ -28,8 +28,7 @@ const inr = (n) => (n == null || n === '' ? null : '₹' + Number(n).toLocaleStr
  * @returns {Promise<{answer?: string, error?: string}>} never throws
  */
 export async function askRecruiter(question, candidates) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return { error: 'The AI recruiter is not configured (no GEMINI_API_KEY on the server).' };
+  if (!claudeConfigured()) return { error: 'The AI recruiter is not configured (no ANTHROPIC_API_KEY on the server).' };
   if (!question || !question.trim()) return { error: 'Type a question first.' };
   if (!candidates.length)
     return { answer: 'There are no candidates in the current view, so there is nothing to look at. Clear the filters and try again.' };
@@ -53,25 +52,7 @@ export async function askRecruiter(question, candidates) {
     `HR QUESTION\n-----------\n${question.trim()}`;
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      const why = data?.error?.message || `HTTP ${res.status}`;
-      return { error: `Gemini: ${why}` };
-    }
-    const text = (data?.candidates?.[0]?.content?.parts || [])
-      .map((p) => p.text || '')
-      .join('')
-      .trim();
+    const text = (await claudeText(INSTRUCTIONS, prompt, 1024)).trim();
     return { answer: text || 'The AI returned an empty answer. Try rephrasing the question.' };
   } catch (err) {
     return { error: err.message };

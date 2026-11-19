@@ -7,8 +7,9 @@ import ResumeViewer from '../components/ResumeViewer.jsx';
 function shortAiError(msg) {
   const m = (msg || '').toLowerCase();
   if (!m) return 'Could not read the resume';
-  if (m.includes('quota') || m.includes('rate') || m.includes('billing')) return 'AI quota reached — retry later';
-  if (m.includes('high demand') || m.includes('overload') || m.includes('503') || m.includes('unavailable')) return 'AI busy — retry';
+  if (m.includes('credit') || m.includes('billing')) return 'AI credit/billing issue';
+  if (m.includes('quota') || m.includes('rate') || m.includes('429')) return 'AI rate limit — retry later';
+  if (m.includes('high demand') || m.includes('overload') || m.includes('503') || m.includes('529') || m.includes('unavailable')) return 'AI busy — retry';
   if (m.includes('no readable text') || m.includes('scanned') || m.includes('image-only')) return 'Scanned/image PDF — no text';
   if (m.includes('utf8') || m.includes('byte sequence') || m.includes('encoding')) return 'Resume text could not be read';
   if (m.includes('api key') || m.includes('permission') || m.includes('denied')) return 'AI not configured';

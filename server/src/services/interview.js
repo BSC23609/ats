@@ -1,37 +1,10 @@
 // AI first-round interview — generates tailored questions from the candidate's self-introduction,
-// resume and the job description, and scores the finished transcript. Backed by Gemini.
+// resume and the job description, and scores the finished transcript. Backed by Claude.
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.7-flash';
+import { claudeJSON, claudeConfigured } from './claude.js';
 
 export function interviewAiConfigured() {
-  return !!process.env.GEMINI_API_KEY;
-}
-
-/** One Gemini JSON call. Returns the parsed object, or throws with a readable message. */
-async function callGemini(systemInstruction, prompt, maxOutputTokens = 1024) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error('GEMINI_API_KEY is not set.');
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens, responseMimeType: 'application/json' },
-    }),
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(`Gemini: ${data?.error?.message || `HTTP ${res.status}`}`);
-
-  const raw = (data?.candidates?.[0]?.content?.parts || [])
-    .map((p) => p.text || '')
-    .join('')
-    .replace(/```json|```/g, '')
-    .trim();
-  return JSON.parse(raw);
+  return claudeConfigured();
 }
 
 /**
@@ -58,7 +31,7 @@ export async function generateQuestions({ position, company, intro, resumeText, 
     `JOB DESCRIPTION\n---------------\n${(jobDescription || 'Not provided — use the role title.').slice(0, 8000)}\n\n` +
     `RESUME\n------\n${(resumeText || 'No resume text available.').slice(0, 20000)}`;
 
-  const out = await callGemini(system, prompt, 1024);
+  const out = await claudeJSON(system, prompt, 1024);
   const questions = Array.isArray(out?.questions) ? out.questions.filter((x) => typeof x === 'string' && x.trim()) : [];
   if (!questions.length) throw new Error('No questions were generated.');
   return questions.map((s) => s.trim()).slice(0, count);
@@ -86,7 +59,7 @@ export async function scoreInterview({ position, company, jobDescription, transc
     `JOB DESCRIPTION\n---------------\n${(jobDescription || 'Not provided — use the role title.').slice(0, 8000)}\n\n` +
     `INTERVIEW TRANSCRIPT\n--------------------\n${convo.slice(0, 24000)}`;
 
-  const out = await callGemini(system, prompt, 1024);
+  const out = await claudeJSON(system, prompt, 1024);
   let score = Number(out?.score);
   if (!Number.isFinite(score)) score = null;
   else score = Math.max(0, Math.min(10, Math.round(score * 10) / 10));

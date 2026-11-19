@@ -1,10 +1,9 @@
-// AI JD writer — turns the basic role details into a structured job description, using the same
-// Google Gemini key and model as resume scoring. Returns a plain object (jd_doc) that the branded
-// JD page renders, plus a renderer that turns it into the sanitised HTML shown on the careers page.
+// AI JD writer — turns the basic role details into a structured job description with Claude.
+// Returns a plain object (jd_doc) that the branded JD page renders, plus a renderer that turns it
+// into the sanitised HTML shown on the careers page.
 
 import { sanitise } from './html.js';
-
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.7-flash';
+import { claudeJSON, claudeConfigured } from './claude.js';
 
 const INSTRUCTIONS =
   `You are an experienced HR copywriter for the Bharat Steel Group, a Chennai-based industrial ` +
@@ -29,8 +28,7 @@ const INSTRUCTIONS =
  * @returns {Promise<{jd_doc?: object, error?: string}>} never throws
  */
 export async function generateJD({ title, department, location, employment_type, experience, company, notes }) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return { error: 'The JD writer is not configured (no GEMINI_API_KEY on the server).' };
+  if (!claudeConfigured()) return { error: 'The JD writer is not configured (no ANTHROPIC_API_KEY on the server).' };
   if (!title || !title.trim()) return { error: 'A job title is needed to write a JD.' };
 
   const prompt =
@@ -43,30 +41,7 @@ export async function generateJD({ title, department, location, employment_type,
     `Key points from HR (optional): ${(notes && notes.trim()) || 'none given'}`;
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 2048,
-          responseMimeType: 'application/json',
-        },
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) return { error: `Gemini: ${data?.error?.message || `HTTP ${res.status}`}` };
-
-    const raw = (data?.candidates?.[0]?.content?.parts || [])
-      .map((p) => p.text || '')
-      .join('')
-      .replace(/```json|```/g, '')
-      .trim();
-
-    const doc = JSON.parse(raw);
+    const doc = await claudeJSON(INSTRUCTIONS, prompt, 2048);
     // Normalise: arrays are arrays, strings are strings; drop anything unexpected.
     const arr = (v) => (Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : []);
     const jd_doc = {
