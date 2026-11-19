@@ -10,19 +10,20 @@ const INSTRUCTIONS =
   `You are an experienced HR copywriter for the Bharat Steel Group, a Chennai-based industrial ` +
   `group (steel trading and processing, pre-engineered buildings, roofing, and software). Write a ` +
   `clear, professional, modern job description from the basic details given.\n\n` +
-  `Return ONLY JSON in exactly this shape:\n` +
+  `Keep it tight — the whole JD must fit on one page. Return ONLY JSON in exactly this shape:\n` +
   `{\n` +
   `  "tagline": "one short line that sums up the role (max 12 words)",\n` +
-  `  "about_role": "2 to 3 sentence overview of the role and why it matters",\n` +
-  `  "responsibilities": ["6 to 9 concrete duties, each a short phrase starting with a verb"],\n` +
-  `  "requirements": ["5 to 7 must-have skills or experience, short phrases"],\n` +
-  `  "preferred": ["0 to 4 nice-to-have points, short phrases (may be empty)"],\n` +
-  `  "qualifications": ["1 to 3 education or certification points"],\n` +
-  `  "what_we_offer": ["3 to 5 points on growth, environment and benefits, generic but relevant"]\n` +
+  `  "about_role": "2 sentence overview of the role and why it matters",\n` +
+  `  "responsibilities": ["5 to 6 concrete duties, each a short phrase starting with a verb"],\n` +
+  `  "requirements": ["4 to 5 must-have skills or experience, short phrases"],\n` +
+  `  "preferred": ["0 to 3 nice-to-have points, short phrases (may be empty)"],\n` +
+  `  "qualifications": ["1 to 2 education or certification points"],\n` +
+  `  "what_we_offer": ["3 points on growth, environment and benefits, generic but relevant"]\n` +
   `}\n\n` +
   `Rules: write for an Indian audience; be specific to the role and industry; keep each list item ` +
-  `concise (no full paragraphs inside lists); do not invent a salary; do not use markdown; do not ` +
-  `add any field beyond the shape above. If the user gave key points, weave them in.`;
+  `to a short single line (aim for under 12 words, no full sentences or paragraphs in lists); do ` +
+  `not invent a salary; do not use markdown; do not add any field beyond the shape above. If the ` +
+  `user gave key points, weave them in.`;
 
 /**
  * @returns {Promise<{jd_doc?: object, error?: string}>} never throws
