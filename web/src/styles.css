@@ -140,7 +140,7 @@ main { padding: 30px 34px 70px; max-width: 1440px; }
 .page-head .sub { margin-top: 5px; max-width: 60ch; }
 
 /* ---------- panels ---------- */
-.panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); overflow-x: auto; }
 .panel-head {
   padding: 13px 17px; border-bottom: 1px solid var(--line-soft);
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
