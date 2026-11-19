@@ -106,6 +106,26 @@ export default function Pipeline() {
     }
   };
 
+  // One-click advance to the next pipeline stage, straight from the list.
+  const [proceeding, setProceeding] = useState(null);
+  const nextStage = (status) => {
+    const i = PIPELINE.indexOf(status);
+    return i >= 0 && i < PIPELINE.length - 1 ? PIPELINE[i + 1] : null;
+  };
+  const proceed = async (a) => {
+    const next = nextStage(a.status);
+    if (!next) return;
+    setProceeding(a.id);
+    try {
+      await api.post(`/applications/${a.id}/status`, { status: next });
+      await load();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setProceeding(null);
+    }
+  };
+
   // Permanently delete the whole candidate row from the pipeline.
   const deleteRow = async (a) => {
     if (!window.confirm(
@@ -260,6 +280,7 @@ export default function Pipeline() {
                 <th>Status</th>
                 <th>Applied</th>
                 <th>HR email</th>
+                <th>Proceed</th>
               </tr>
             </thead>
             <tbody>
@@ -347,6 +368,18 @@ export default function Pipeline() {
                             onClick={() => deleteRow(a)}>
                       Delete log
                     </button>
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    {nextStage(a.status) ? (
+                      <button className="ghost small"
+                              disabled={proceeding === a.id}
+                              title={`Move ${a.full_name} to ${STATUS_LABEL[nextStage(a.status)]}`}
+                              onClick={() => proceed(a)}>
+                        {proceeding === a.id ? 'Moving…' : `→ ${STATUS_LABEL[nextStage(a.status)]}`}
+                      </button>
+                    ) : (
+                      <span className="sub">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
