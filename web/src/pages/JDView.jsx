@@ -30,6 +30,12 @@ const CSS = `
 
 .jd-body{padding:26px 40px 16px}
 .jd-lede{font-size:15.5px;color:#2b3542;margin:0 0 20px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.jd-rich{font-size:14.5px;color:#2b3542;line-height:1.6}
+.jd-rich p{margin:0 0 12px}
+.jd-rich strong{color:#0a2b66}
+.jd-rich ul,.jd-rich ol{margin:6px 0 16px;padding-left:20px}
+.jd-rich li{margin:4px 0}
+.jd-rich h1,.jd-rich h2,.jd-rich h3,.jd-rich h4{color:#0a2b66;margin:16px 0 8px;font-size:15px}
 .jd-cols{column-count:2;column-gap:40px}
 .jd-sec{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin:0 0 18px;display:inline-block;width:100%}
 .jd-sec h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy);font-weight:750;
@@ -142,6 +148,17 @@ export default function JDView() {
               </div>
             </div>
 
+            <div className="jd-cta">
+              <span className="t">Interested? Apply in a few minutes.</span>
+              <a href={`/careers?job=${job.id}`} target="_blank" rel="noopener noreferrer">Apply for this role →</a>
+            </div>
+          </>
+        ) : job.description ? (
+          <>
+            {/* No AI-structured JD yet — show the role's own careers description. */}
+            <div className="jd-body">
+              <div className="jd-rich" dangerouslySetInnerHTML={{ __html: job.description }} />
+            </div>
             <div className="jd-cta">
               <span className="t">Interested? Apply in a few minutes.</span>
               <a href={`/careers?job=${job.id}`} target="_blank" rel="noopener noreferrer">Apply for this role →</a>

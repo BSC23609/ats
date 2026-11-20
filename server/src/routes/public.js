@@ -68,7 +68,7 @@ r.get('/openings/:id', async (req, res) => {
 r.get('/jobs/:id/jd', async (req, res) => {
   const job = await one(
     `SELECT j.id, j.title, j.department, j.location, j.employment_type,
-            j.min_experience, j.max_experience, j.status, j.jd_doc,
+            j.min_experience, j.max_experience, j.status, j.jd_doc, j.description,
             c.code AS company_code, c.name AS company_name
        FROM jobs j JOIN companies c ON c.id = j.company_id
       WHERE j.id = $1 AND c.active`,
