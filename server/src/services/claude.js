@@ -4,7 +4,7 @@
 //
 // Env: ANTHROPIC_API_KEY (required), ANTHROPIC_MODEL (optional, defaults below).
 
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5';
+const MODEL = (process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5').trim();
 const API = 'https://api.anthropic.com/v1/messages';
 
 export function claudeConfigured() {
