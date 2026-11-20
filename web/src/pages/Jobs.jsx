@@ -127,6 +127,16 @@ export default function Jobs() {
     e.preventDefault();
     setError('');
     const body = Object.fromEntries(new FormData(e.target));
+    // "Write the description with AI" key points are required.
+    if (!genNotes.trim()) {
+      setError('Please fill in “Write the description with AI”.');
+      return;
+    }
+    // The JD must be generated with AI before posting.
+    if (!createDoc) {
+      setError('Please click “Generate JD with AI” before posting the opening.');
+      return;
+    }
     // The role description ("What the role involves") is a rich editor, so validate it here.
     if (!desc.replace(/<[^>]*>/g, '').trim()) {
       setError('Please fill in “What the role involves”.');
@@ -514,15 +524,18 @@ export default function Jobs() {
               </div>
             </div>
             <div className="field">
-              <label>Write the description with AI (optional)</label>
+              <label>Write the description with AI <span className="req">*</span></label>
               <textarea value={genNotes} onChange={(e) => setGenNotes(e.target.value)}
                         style={{ minHeight: 60 }}
-                        placeholder="Key points / must-have skills to include (optional). Fill in the title and other fields above first…" />
+                        placeholder="Key points / must-have skills to include. Fill in the title and other fields above first…" />
               <div className="row" style={{ gap: 8, marginTop: 8, alignItems: 'center' }}>
                 <button type="button" className="ghost" onClick={genForCreate} disabled={genBusy}>
                   {genBusy ? 'Writing…' : '✨ Generate JD with AI'}
                 </button>
-                {createDoc && <span className="sub">JD written — review the description below; a branded JD page is created too.</span>}
+                <span className="req">*</span>
+                {createDoc
+                  ? <span className="sub">JD written — review the description below; a branded JD page is created too.</span>
+                  : <span className="sub">Required before posting the opening.</span>}
               </div>
               {genErr && <div className="error" style={{ marginTop: 8 }}>{genErr}</div>}
             </div>
