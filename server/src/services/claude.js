@@ -50,21 +50,20 @@ async function call(body, { retries = 4 } = {}) {
   throw lastErr;
 }
 
-/** Ask Claude and parse a single JSON object back. We prefill "{" so the reply is always JSON. */
+/** Ask Claude and parse a single JSON object back. Works on any model (no assistant prefill). */
 export async function claudeJSON(system, prompt, maxTokens = 1500) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set.');
   const text = await call({
     model: MODEL,
     max_tokens: maxTokens,
-    system,
-    messages: [
-      { role: 'user', content: prompt },
-      { role: 'assistant', content: '{' }, // prefill forces a JSON object
-    ],
+    system: `${system}\n\nRespond with ONLY a single valid JSON object — no markdown, no code fences, no commentary before or after.`,
+    messages: [{ role: 'user', content: prompt }],
   });
-  let raw = ('{' + text).replace(/```json|```/g, '').trim();
-  const last = raw.lastIndexOf('}');
-  if (last >= 0) raw = raw.slice(0, last + 1);
+  let raw = text.replace(/```json|```/g, '').trim();
+  // Isolate the JSON object even if the model adds any stray text around it.
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start >= 0 && end >= start) raw = raw.slice(start, end + 1);
   return JSON.parse(raw);
 }
 
