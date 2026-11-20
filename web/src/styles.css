@@ -144,6 +144,7 @@ main { padding: 30px 34px 70px; max-width: 1440px; }
 /* Pipeline table: the page scrolls vertically as normal (easy mouse-wheel scroll);
    the table only scrolls sideways for the extra columns. */
 .panel.scroll-xy { overflow-x: auto; }
+.req { color: #c0392b; font-weight: 700; }
 .panel-head {
   padding: 13px 17px; border-bottom: 1px solid var(--line-soft);
   display: flex; align-items: center; justify-content: space-between; gap: 14px;

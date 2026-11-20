@@ -479,7 +479,7 @@ export default function Jobs() {
             {error && <div className="error" style={{ marginBottom: 14 }}>{error}</div>}
             <div className="field-row">
               <div className="field">
-                <label htmlFor="company_id">Company</label>
+                <label htmlFor="company_id">Company <span className="req">*</span></label>
                 <select id="company_id" name="company_id" required
                         defaultValue={companies.length === 1 ? companies[0].id : ''}>
                   <option value="" disabled>Select</option>
@@ -487,19 +487,19 @@ export default function Jobs() {
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="title">Job title</label>
+                <label htmlFor="title">Job title <span className="req">*</span></label>
                 <input id="title" name="title" required placeholder="Design Engineer — PEB" />
               </div>
               <div className="field">
-                <label htmlFor="department">Department</label>
+                <label htmlFor="department">Department <span className="req">*</span></label>
                 <input id="department" name="department" required />
               </div>
               <div className="field">
-                <label htmlFor="location">Location</label>
+                <label htmlFor="location">Location <span className="req">*</span></label>
                 <input id="location" name="location" required defaultValue="Chennai" />
               </div>
               <div className="field">
-                <label htmlFor="min_experience">Minimum experience (years)</label>
+                <label htmlFor="min_experience">Minimum experience (years) <span className="req">*</span></label>
                 <input id="min_experience" name="min_experience" type="number" step="0.5" min="0" required defaultValue="0" />
               </div>
               <div className="field">
