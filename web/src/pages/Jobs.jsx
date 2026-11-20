@@ -504,8 +504,8 @@ export default function Jobs() {
               </div>
               <div className="field">
                 <label htmlFor="max_experience">Maximum experience (years)</label>
-                <input id="max_experience" name="max_experience" type="number" step="0.5" min="0" required
-                       placeholder="e.g. 5" />
+                <input id="max_experience" name="max_experience" type="number" step="0.5" min="0"
+                       placeholder="No limit" />
               </div>
             </div>
             <div className="field">
