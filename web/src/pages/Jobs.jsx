@@ -3,6 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { api, useAuth, date, experienceRange } from '../api.jsx';
 import RichText from '../components/RichText.jsx';
 
+// Standard departments across the group, offered as a dropdown when posting/editing a role.
+const DEPARTMENTS = [
+  'Sales & Marketing',
+  'Design & Engineering',
+  'Projects',
+  'Production',
+  'Quality',
+  'Stores & Dispatch',
+  'Procurement',
+  'Accounts & Finance',
+  'HR & Admin',
+  'IT / Software',
+  'Maintenance',
+];
+
 export default function Jobs() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -361,8 +376,14 @@ export default function Jobs() {
               <div className="field-row">
                 <div className="field">
                   <label htmlFor="e_dept">Department</label>
-                  <input id="e_dept" value={editing.department}
-                         onChange={(e) => setEditing({ ...editing, department: e.target.value })} />
+                  <select id="e_dept" value={editing.department || ''}
+                          onChange={(e) => setEditing({ ...editing, department: e.target.value })}>
+                    <option value="" disabled>Select</option>
+                    {/* Keep any existing non-standard value selectable. */}
+                    {editing.department && !DEPARTMENTS.includes(editing.department) &&
+                      <option value={editing.department}>{editing.department}</option>}
+                    {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
                 </div>
                 <div className="field">
                   <label htmlFor="e_loc">Location</label>
@@ -507,7 +528,10 @@ export default function Jobs() {
               </div>
               <div className="field">
                 <label htmlFor="department">Department <span className="req">*</span></label>
-                <input id="department" name="department" required />
+                <select id="department" name="department" required defaultValue="">
+                  <option value="" disabled>Select</option>
+                  {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
               </div>
               <div className="field">
                 <label htmlFor="location">Location <span className="req">*</span></label>
