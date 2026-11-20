@@ -100,6 +100,26 @@ export default function JDView() {
     setTimeout(() => setCopied(false), 1600);
   };
 
+  // Download the branded JD as a self-contained HTML file (images made absolute so it opens offline).
+  const downloadJD = () => {
+    const paper = document.querySelector('.jd-paper');
+    if (!paper) return;
+    const inner = paper.outerHTML.replace(/src="\//g, `src="${window.location.origin}/`);
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">`
+      + `<meta name="viewport" content="width=device-width,initial-scale=1">`
+      + `<title>${(job?.title || 'Job Description')} — Job Description</title><style>${CSS}</style></head>`
+      + `<body class="jd-wrap">${inner}</body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(job?.title || 'role').replace(/[^\w]+/g, '-')}-JD.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   if (error)
     return (
       <div className="jd-wrap"><style>{CSS}</style>
@@ -120,6 +140,7 @@ export default function JDView() {
       <div className="jd-toolbar">
         <button className="primary" onClick={() => window.print()}>Print / Save as PDF</button>
         <button onClick={copyLink}>{copied ? 'Link copied' : 'Copy link'}</button>
+        <button onClick={downloadJD}>Download</button>
       </div>
 
       <div className="jd-paper">
