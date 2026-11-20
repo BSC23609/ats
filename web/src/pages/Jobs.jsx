@@ -654,9 +654,6 @@ export default function Jobs() {
                         JD page
                       </button>
                       <button className="ghost small" onClick={() => openEdit(j)}>Edit</button>
-                      <button className="ghost small" onClick={() => { setJd(j); setJdText(''); setJdFile(null); setMsg(''); }}>
-                        {j.has_jd ? 'Replace JD' : 'Upload JD'}
-                      </button>
                       {user.role === 'SUPER_ADMIN' && (
                         <button className="ghost small" onClick={() => askDelete(j)}
                                 style={{ color: 'var(--red)', borderColor: 'var(--line)' }}>
