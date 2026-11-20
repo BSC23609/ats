@@ -56,7 +56,6 @@ export async function claudeJSON(system, prompt, maxTokens = 1500) {
   const text = await call({
     model: MODEL,
     max_tokens: maxTokens,
-    temperature: 0.3,
     system,
     messages: [
       { role: 'user', content: prompt },
@@ -70,12 +69,11 @@ export async function claudeJSON(system, prompt, maxTokens = 1500) {
 }
 
 /** Ask Claude for a plain-text answer. */
-export async function claudeText(system, prompt, maxTokens = 1024, temperature = 0.3) {
+export async function claudeText(system, prompt, maxTokens = 1024) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set.');
   return call({
     model: MODEL,
     max_tokens: maxTokens,
-    temperature,
     system,
     messages: [{ role: 'user', content: prompt }],
   });
