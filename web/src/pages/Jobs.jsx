@@ -41,6 +41,11 @@ export default function Jobs() {
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null); // which opening's link was just copied
 
+  // Department selection for the New opening form ("Other" reveals a free-text box).
+  const [cDept, setCDept] = useState('');
+  const [cDeptOther, setCDeptOther] = useState('');
+  const [editDeptOther, setEditDeptOther] = useState(false);
+
   // AI JD writer state.
   const createFormRef = useRef(null);
   const [createDoc, setCreateDoc] = useState(null); // generated jd_doc held until the opening is created
@@ -68,7 +73,7 @@ export default function Jobs() {
     const comp = companies.find((c) => String(c.id) === String(f.company_id));
     generateJD(
       {
-        title: f.title, department: f.department, location: f.location,
+        title: f.title, department: cDept === '__other__' ? cDeptOther.trim() : cDept, location: f.location,
         employment_type: f.employment_type || 'Full-time',
         min_experience: f.min_experience, max_experience: f.max_experience,
         company_name: comp?.name, notes: genNotes,
@@ -142,6 +147,13 @@ export default function Jobs() {
     e.preventDefault();
     setError('');
     const body = Object.fromEntries(new FormData(e.target));
+    // Department comes from the dropdown, or the free-text box when "Other" is chosen.
+    const department = (cDept === '__other__' ? cDeptOther : cDept).trim();
+    if (!department) {
+      setError('Please choose a department.');
+      return;
+    }
+    body.department = department;
     // "Write the description with AI" key points are required.
     if (!genNotes.trim()) {
       setError('Please fill in “Write the description with AI”.');
@@ -164,6 +176,7 @@ export default function Jobs() {
       setCreateDoc(null);
       setGenNotes('');
       setGenErr('');
+      setCDept(''); setCDeptOther('');
       load();
     } catch (err) {
       setError(err.message);
@@ -207,6 +220,8 @@ export default function Jobs() {
     setMsg('');
     setGenErr('');
     setEditNotes('');
+    // Start in free-text mode if the saved department isn't one of the standard options.
+    setEditDeptOther(!!j.department && !DEPARTMENTS.includes(j.department));
     setEditing({
       id: j.id,
       company_id: j.company_id,
@@ -376,14 +391,20 @@ export default function Jobs() {
               <div className="field-row">
                 <div className="field">
                   <label htmlFor="e_dept">Department</label>
-                  <select id="e_dept" value={editing.department || ''}
-                          onChange={(e) => setEditing({ ...editing, department: e.target.value })}>
+                  <select id="e_dept"
+                          value={editDeptOther ? '__other__' : (editing.department || '')}
+                          onChange={(e) => {
+                            if (e.target.value === '__other__') { setEditDeptOther(true); setEditing({ ...editing, department: '' }); }
+                            else { setEditDeptOther(false); setEditing({ ...editing, department: e.target.value }); }
+                          }}>
                     <option value="" disabled>Select</option>
-                    {/* Keep any existing non-standard value selectable. */}
-                    {editing.department && !DEPARTMENTS.includes(editing.department) &&
-                      <option value={editing.department}>{editing.department}</option>}
                     {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    <option value="__other__">Other…</option>
                   </select>
+                  {editDeptOther &&
+                    <input value={editing.department || ''}
+                           onChange={(e) => setEditing({ ...editing, department: e.target.value })}
+                           placeholder="Type the department" style={{ marginTop: 6 }} />}
                 </div>
                 <div className="field">
                   <label htmlFor="e_loc">Location</label>
@@ -528,10 +549,14 @@ export default function Jobs() {
               </div>
               <div className="field">
                 <label htmlFor="department">Department <span className="req">*</span></label>
-                <select id="department" name="department" required defaultValue="">
+                <select id="department" value={cDept} onChange={(e) => setCDept(e.target.value)} required>
                   <option value="" disabled>Select</option>
                   {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  <option value="__other__">Other…</option>
                 </select>
+                {cDept === '__other__' &&
+                  <input value={cDeptOther} onChange={(e) => setCDeptOther(e.target.value)}
+                         placeholder="Type the department" style={{ marginTop: 6 }} />}
               </div>
               <div className="field">
                 <label htmlFor="location">Location <span className="req">*</span></label>
