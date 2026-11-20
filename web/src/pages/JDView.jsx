@@ -173,9 +173,6 @@ export default function JDView() {
 
         <div className="jd-foot">
           <GroupLogo className="" />
-          <div className="contact">
-            Apply: ats.thebharatsteelgroup.com/careers&nbsp;·&nbsp;WhatsApp: wa.me/919500680093
-          </div>
         </div>
       </div>
     </div>
