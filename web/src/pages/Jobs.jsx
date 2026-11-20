@@ -492,20 +492,20 @@ export default function Jobs() {
               </div>
               <div className="field">
                 <label htmlFor="department">Department</label>
-                <input id="department" name="department" />
+                <input id="department" name="department" required />
               </div>
               <div className="field">
                 <label htmlFor="location">Location</label>
-                <input id="location" name="location" defaultValue="Chennai" />
+                <input id="location" name="location" required defaultValue="Chennai" />
               </div>
               <div className="field">
                 <label htmlFor="min_experience">Minimum experience (years)</label>
-                <input id="min_experience" name="min_experience" type="number" step="0.5" min="0" defaultValue="0" />
+                <input id="min_experience" name="min_experience" type="number" step="0.5" min="0" required defaultValue="0" />
               </div>
               <div className="field">
                 <label htmlFor="max_experience">Maximum experience (years)</label>
-                <input id="max_experience" name="max_experience" type="number" step="0.5" min="0"
-                       placeholder="No limit" />
+                <input id="max_experience" name="max_experience" type="number" step="0.5" min="0" required
+                       placeholder="e.g. 5" />
               </div>
             </div>
             <div className="field">
