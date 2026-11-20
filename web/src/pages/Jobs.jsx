@@ -127,6 +127,11 @@ export default function Jobs() {
     e.preventDefault();
     setError('');
     const body = Object.fromEntries(new FormData(e.target));
+    // The role description ("What the role involves") is a rich editor, so validate it here.
+    if (!desc.replace(/<[^>]*>/g, '').trim()) {
+      setError('Please fill in “What the role involves”.');
+      return;
+    }
     try {
       await api.post('/jobs', { ...body, description: desc, jd_doc: createDoc });
       setAdding(false);
@@ -503,9 +508,9 @@ export default function Jobs() {
                 <input id="min_experience" name="min_experience" type="number" step="0.5" min="0" required defaultValue="0" />
               </div>
               <div className="field">
-                <label htmlFor="max_experience">Maximum experience (years)</label>
-                <input id="max_experience" name="max_experience" type="number" step="0.5" min="0"
-                       placeholder="No limit" />
+                <label htmlFor="max_experience">Maximum experience (years) <span className="req">*</span></label>
+                <input id="max_experience" name="max_experience" type="number" step="0.5" min="0" required
+                       placeholder="e.g. 5" />
               </div>
             </div>
             <div className="field">
@@ -523,7 +528,7 @@ export default function Jobs() {
             </div>
 
             <div className="field">
-              <label htmlFor="description">What the role involves</label>
+              <label htmlFor="description">What the role involves <span className="req">*</span></label>
               <RichText value={desc} onChange={setDesc}
                         placeholder="Responsibilities, what a good week looks like, the software and codes they will use, who they report to…" />
               <p className="sub" style={{ marginTop: 6 }}>
