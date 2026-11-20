@@ -618,7 +618,7 @@ export default function Jobs() {
         ) : (
           <table>
             <thead>
-              <tr><th>Role</th><th>Location</th><th>Min. experience</th><th>Job description</th><th>Applicants</th><th>Status</th><th>Posted</th><th></th></tr>
+              <tr><th>Role</th><th>Location</th><th>Min. experience</th><th>Applicants</th><th>Status</th><th>Posted</th><th></th></tr>
             </thead>
             <tbody>
               {shown.map((j) => (
@@ -629,11 +629,6 @@ export default function Jobs() {
                   </td>
                   <td>{j.location || '—'}</td>
                   <td>{experienceRange(j.min_experience, j.max_experience)}</td>
-                  <td>
-                    {j.has_jd
-                      ? <span className="chip JOINED">On file</span>
-                      : <span className="chip ON_HOLD">Not uploaded</span>}
-                  </td>
                   <td>
                     {j.applicant_count > 0 ? (
                       <button onClick={() => navigate(`/pipeline?job=${j.id}`)}
