@@ -59,7 +59,18 @@ export async function scoreInterview({ position, company, jobDescription, transc
     `JOB DESCRIPTION\n---------------\n${(jobDescription || 'Not provided — use the role title.').slice(0, 8000)}\n\n` +
     `INTERVIEW TRANSCRIPT\n--------------------\n${convo.slice(0, 24000)}`;
 
-  const out = await claudeJSON(system, prompt, 1024);
+  // Score on a fast model (Haiku) for a quick turnaround; fall back to the default model if needed.
+  const fastModel = process.env.ANTHROPIC_SCORING_MODEL || 'claude-haiku-5-5';
+  let out;
+  try {
+    out = await claudeJSON(system, prompt, 1024, fastModel);
+  } catch (err) {
+    if (/model/i.test(err.message) && /not.?found|does not exist|invalid|unknown|did you mean/i.test(err.message)) {
+      out = await claudeJSON(system, prompt, 1024);
+    } else {
+      throw err;
+    }
+  }
   let score = Number(out?.score);
   if (!Number.isFinite(score)) score = null;
   else score = Math.max(0, Math.min(10, Math.round(score * 10) / 10));

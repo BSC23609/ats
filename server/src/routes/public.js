@@ -8,7 +8,7 @@ import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
 import { tts, stt, sarvamConfigured } from '../services/sarvam.js';
-import { generateQuestions, scoreInterview } from '../services/interview.js';
+import { scoreInterview } from '../services/interview.js';
 
 // The first-round AI interview runs for at most this long, from the first question onward.
 const INTERVIEW_MS = 5 * 60 * 1000;
@@ -293,10 +293,9 @@ r.post('/interview/:token/start', async (req, res) => {
   const first = (app.full_name || '').trim().split(/\s+/)[0] || 'there';
   const greeting =
     `Hello ${first}, and welcome to your first-round interview for the ${app.position_applied} role ` +
-    `at ${app.company_name}. This will take about five minutes. ` +
-    `To begin, please introduce yourself — tell me about your background, your experience, and why this ` +
-    `role interests you. You have up to about a minute and a half for this. ` +
-    `After that, I will ask you a few questions, and you can keep those answers brief.`;
+    `at ${app.company_name}. This is a short introduction round and will only take a couple of minutes. ` +
+    `Please introduce yourself — tell me about your background, your experience, and why this role ` +
+    `interests you. You have up to about a minute and a half. When you have finished, press Done. All the best.`;
 
   const voice = await tts(greeting);
   if (voice.error) return res.status(502).json({ error: voice.error });
@@ -328,62 +327,20 @@ r.post('/interview/:token/answer', audioUpload.array('audio', 6), async (req, re
   const files = req.files || [];
   if (!files.length) return res.status(400).json({ error: 'No audio was received.' });
 
-  // The answer may arrive as several <=30s clips (a long self-introduction). Transcribe each
-  // (Sarvam caps a clip at 30s) and join them into the full answer.
-  const parts = [];
-  for (const f of files) {
-    const out = await stt(f.buffer, f.originalname || 'answer.webm', f.mimetype);
-    if (out.error) return res.status(502).json({ error: out.error });
-    if (out.transcript && out.transcript.trim()) parts.push(out.transcript.trim());
-  }
-  const answerText = parts.join(' ');
+  // The introduction may arrive as several <=30s clips (Sarvam caps a clip at 30s). Transcribe them
+  // in parallel for speed and join them into the full introduction.
+  const results = await Promise.all(
+    files.map((f) => stt(f.buffer, f.originalname || 'answer.webm', f.mimetype))
+  );
+  const errored = results.find((r) => r.error);
+  if (errored) return res.status(502).json({ error: errored.error });
+  const answerText = results.map((r) => (r.transcript || '').trim()).filter(Boolean).join(' ');
 
   const transcript = Array.isArray(app.interview_transcript) ? app.interview_transcript : [];
   transcript.push({ role: 'candidate', text: answerText });
 
-  // How many questions the candidate has answered so far — the first answer is the self-introduction.
-  const answered = transcript.filter((t) => t.role === 'candidate').length;
-
-  // The self-introduction just came in → build the question set now.
-  let result = app.interview_result && typeof app.interview_result === 'object' ? app.interview_result : {};
-  let questions = Array.isArray(result.questions) ? result.questions : null;
-  if (answered === 1 || !questions) {
-    try {
-      questions = await generateQuestions({
-        position: app.position_applied,
-        company: app.company_name,
-        intro: transcript.find((t) => t.role === 'candidate')?.text || '',
-        resumeText: app.resume_text,
-        jobDescription: app.job_description,
-        count: 6,
-      });
-    } catch {
-      questions = []; // if generation fails, we simply wrap up after the intro
-    }
-    result = { ...result, questions };
-    await q(`UPDATE applications SET interview_result=$2 WHERE id=$1`, [app.id, JSON.stringify(result)]);
-  }
-
-  // Have we run out of time (measured from the first question) or out of questions?
-  const startedFrom = app.interview_started_at ? new Date(app.interview_started_at).getTime() : Date.now();
-  const outOfTime = Date.now() - startedFrom >= INTERVIEW_MS;
-  const nextIndex = answered - 1; // answered=1 (intro) → ask questions[0]
-  const nextQuestion = questions[nextIndex];
-
-  if (!nextQuestion || outOfTime) {
-    // Persist the latest answer, then finalise and score.
-    return finishInterview({ ...app, interview_result: result }, transcript, res);
-  }
-
-  // Ask the next question.
-  transcript.push({ role: 'ai', text: nextQuestion });
-  const voice = await tts(nextQuestion);
-  if (voice.error) return res.status(502).json({ error: voice.error });
-
-  await q(`UPDATE applications SET interview_transcript=$2, updated_at=now() WHERE id=$1`,
-          [app.id, JSON.stringify(transcript)]);
-
-  res.json({ transcript: answerText, done: false, text: nextQuestion, audio: voice.audio });
+  // First round is the self-introduction only — no follow-up questions. Score it and finish.
+  return finishInterview(app, transcript, res);
 });
 
 export default r;
