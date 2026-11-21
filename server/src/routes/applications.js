@@ -437,9 +437,9 @@ r.post('/:id/status', async (req, res) => {
       .catch((e) => console.error('interview email error:', e.message));
   }
 
-  // Moving a candidate to the Interview Score stage automatically sends them the AI first-round
+  // Moving a candidate to the Accepted stage automatically sends them the AI first-round
   // interview link and marks it invited. Fire-and-forget, same as above.
-  if (status === 'INTERVIEW_SCORE') {
+  if (status === 'ACCEPTED') {
     emailAiInterview(app.id)
       .then((out) => {
         if (out.sent) {

@@ -222,7 +222,7 @@ export async function emailAiInterview(appId) {
     if (!app) return { sent: false, reason: 'Application not found.' };
     if (!app.email) return { sent: false, reason: 'Candidate has no email on file.' };
     if (!app.interview_token) return { sent: false, reason: 'No interview link for this candidate.' };
-    if (!graphConfigured()) return { sent: false, reason: 'Email not configured.' };
+    if (!graphConfigured() && !process.env.BREVO_API_KEY) return { sent: false, reason: 'Email not configured.' };
 
     const base = (process.env.PUBLIC_WEB_URL || '').replace(/\/+$/, '');
     if (!base) return { sent: false, reason: 'PUBLIC_WEB_URL is not set.' };
