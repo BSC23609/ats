@@ -31,7 +31,18 @@ export async function generateQuestions({ position, company, intro, resumeText, 
     `JOB DESCRIPTION\n---------------\n${(jobDescription || 'Not provided — use the role title.').slice(0, 8000)}\n\n` +
     `RESUME\n------\n${(resumeText || 'No resume text available.').slice(0, 20000)}`;
 
-  const out = await claudeJSON(system, prompt, 1024);
+  // Generate on a fast model (Haiku) for a quick turnaround, with fallback to the default model.
+  const fastModel = process.env.ANTHROPIC_SCORING_MODEL || 'claude-haiku-5-5';
+  let out;
+  try {
+    out = await claudeJSON(system, prompt, 1024, fastModel);
+  } catch (err) {
+    if (/model/i.test(err.message) && /not.?found|does not exist|invalid|unknown|did you mean/i.test(err.message)) {
+      out = await claudeJSON(system, prompt, 1024);
+    } else {
+      throw err;
+    }
+  }
   const questions = Array.isArray(out?.questions) ? out.questions.filter((x) => typeof x === 'string' && x.trim()) : [];
   if (!questions.length) throw new Error('No questions were generated.');
   return questions.map((s) => s.trim()).slice(0, count);

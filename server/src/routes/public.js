@@ -8,7 +8,7 @@ import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
 import { tts, stt, sarvamConfigured } from '../services/sarvam.js';
-import { scoreInterview } from '../services/interview.js';
+import { generateQuestions, scoreInterview } from '../services/interview.js';
 
 // The first-round AI interview runs for at most this long, from the first question onward.
 const INTERVIEW_MS = 5 * 60 * 1000;
@@ -293,9 +293,10 @@ r.post('/interview/:token/start', async (req, res) => {
   const first = (app.full_name || '').trim().split(/\s+/)[0] || 'there';
   const greeting =
     `Hello ${first}, and welcome to your first-round interview for the ${app.position_applied} role ` +
-    `at ${app.company_name}. This is a short introduction round and will only take a couple of minutes. ` +
-    `Please introduce yourself — tell me about your background, your experience, and why this role ` +
-    `interests you. You have up to about a minute and a half. When you have finished, press Done. All the best.`;
+    `at ${app.company_name}. This will take about five minutes. ` +
+    `To begin, please introduce yourself — tell me about your background, your experience, and why this ` +
+    `role interests you. You have up to about a minute and a half for this. ` +
+    `After that, I will ask you a few questions, and you can keep those answers brief.`;
 
   const voice = await tts(greeting);
   if (voice.error) return res.status(502).json({ error: voice.error });
@@ -339,8 +340,46 @@ r.post('/interview/:token/answer', audioUpload.array('audio', 6), async (req, re
   const transcript = Array.isArray(app.interview_transcript) ? app.interview_transcript : [];
   transcript.push({ role: 'candidate', text: answerText });
 
-  // First round is the self-introduction only — no follow-up questions. Score it and finish.
-  return finishInterview(app, transcript, res);
+  // How many answers so far — the first is the self-introduction.
+  const answered = transcript.filter((t) => t.role === 'candidate').length;
+
+  // After the self-introduction, build the question set from intro + resume + JD.
+  let result = app.interview_result && typeof app.interview_result === 'object' ? app.interview_result : {};
+  let questions = Array.isArray(result.questions) ? result.questions : null;
+  if (answered === 1 || !questions) {
+    try {
+      questions = await generateQuestions({
+        position: app.position_applied,
+        company: app.company_name,
+        intro: transcript.find((t) => t.role === 'candidate')?.text || '',
+        resumeText: app.resume_text,
+        jobDescription: app.job_description,
+        count: 5,
+      });
+    } catch {
+      questions = []; // if generation fails, wrap up after the intro
+    }
+    result = { ...result, questions };
+    await q(`UPDATE applications SET interview_result=$2 WHERE id=$1`, [app.id, JSON.stringify(result)]);
+  }
+
+  // Ask the next question unless the 5-minute cap is reached or the questions are exhausted.
+  const startedFrom = app.interview_started_at ? new Date(app.interview_started_at).getTime() : Date.now();
+  const outOfTime = Date.now() - startedFrom >= INTERVIEW_MS;
+  const nextQuestion = questions[answered - 1]; // answered=1 (intro) → questions[0]
+
+  if (!nextQuestion || outOfTime) {
+    return finishInterview({ ...app, interview_result: result }, transcript, res);
+  }
+
+  transcript.push({ role: 'ai', text: nextQuestion });
+  const voice = await tts(nextQuestion);
+  if (voice.error) return res.status(502).json({ error: voice.error });
+
+  await q(`UPDATE applications SET interview_transcript=$2, updated_at=now() WHERE id=$1`,
+          [app.id, JSON.stringify(transcript)]);
+
+  res.json({ transcript: answerText, done: false, text: nextQuestion, audio: voice.audio });
 });
 
 export default r;

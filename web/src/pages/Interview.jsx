@@ -247,8 +247,8 @@ export default function Interview() {
             This is a short first-round interview for <strong style={{ color: '#fff' }}>{info?.position_applied}</strong> at {info?.company_name}.
           </p>
           <ul className="sub" style={{ lineHeight: 1.9, marginTop: 14 }}>
-            <li>You'll be asked to introduce yourself — your background, experience and interest in the role.</li>
-            <li>Your camera and microphone will be used. You have up to 90 seconds.</li>
+            <li>You'll introduce yourself first (up to 90 seconds), then answer a few short questions.</li>
+            <li>Your camera and microphone will be used. The interview takes about 5 minutes.</li>
             <li>Find a quiet spot with a stable connection, and speak clearly.</li>
           </ul>
           {error && <div className="iv-err" style={{ marginTop: 14 }}>{error}</div>}
@@ -297,9 +297,10 @@ export default function Interview() {
               {phase === 'processing' && <span className="sub">One moment…</span>}
             </div>
             <div className="iv-note">
+              This interview lasts about 5 minutes — <strong style={{ color: '#cfe0f7' }}>{mmss(left)}</strong> remaining.
               {introPhase
-                ? 'Take up to 90 seconds to introduce yourself, then press Done. It stops automatically at the limit.'
-                : 'Please answer briefly; it stops automatically at 30 seconds.'}
+                ? ' Take up to 90 seconds to introduce yourself, then press Done.'
+                : ' Please answer briefly; it stops automatically at 30 seconds.'}
             </div>
           </div>
         </div>
