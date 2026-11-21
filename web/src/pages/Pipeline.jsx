@@ -840,8 +840,9 @@ export default function Pipeline() {
                             ✨ Score
                           </button>
                         )}
-                        {a.ai_status === 'FAILED' && (
+                        {(a.ai_status === 'FAILED' || a.ai_status === 'PENDING') && (
                           <button className="ghost small"
+                                  title={a.ai_status === 'PENDING' ? 'Stuck? Score again' : 'Score again'}
                                   onClick={(e) => { e.stopPropagation(); retryScore(a.id); }}>
                             Retry
                           </button>

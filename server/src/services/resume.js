@@ -200,7 +200,19 @@ export async function summariseResume(
     `\n\nRESUME\n------\n${resumeText.slice(0, 60000)}`;
 
   try {
-    const summary = await claudeJSON(INSTRUCTIONS, prompt, 2048);
+    // Score with a fast model (Haiku) for quick turnaround; fall back to the default model if that
+    // model isn't available on the account. ANTHROPIC_SCORING_MODEL overrides the fast default.
+    const fastModel = process.env.ANTHROPIC_SCORING_MODEL || 'claude-haiku-5-5';
+    let summary;
+    try {
+      summary = await claudeJSON(INSTRUCTIONS, prompt, 1500, fastModel);
+    } catch (err) {
+      if (/model/i.test(err.message) && /not.?found|does not exist|invalid|unknown|did you mean/i.test(err.message)) {
+        summary = await claudeJSON(INSTRUCTIONS, prompt, 1500); // default model
+      } else {
+        throw err;
+      }
+    }
     await q(`UPDATE applications SET ai_summary=$1, ai_status='DONE', updated_at=now() WHERE id=$2`, [
       summary,
       applicationId,
