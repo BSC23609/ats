@@ -38,7 +38,9 @@ h1{font-size:24px;margin:0 0 6px;color:#fff}
 .sub{color:#9fb3d4}
 `;
 
-const MAX_ANSWER_MS = 30000;
+const MAX_ANSWER_MS = 30000;               // a normal answer segment
+const INTRO_MS = 90000;                    // the self-introduction can run up to 90 seconds
+const SEGMENT_MS = 30000;                  // each recorded clip is <=30s (Sarvam transcription limit)
 const INTERVIEW_MS = 5 * 60 * 1000;        // the whole first round is capped at 5 minutes
 const mmss = (ms) => {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -62,6 +64,11 @@ export default function Interview() {
   const countRef = useRef(null);
   const endRef = useRef(0);        // wall-clock time the 5-minute cap is reached
   const overallRef = useRef(null); // interval ticking the overall countdown
+  const segBlobsRef = useRef([]);  // recorded clips for the current answer (intro may have several)
+  const introModeRef = useRef(false);
+  const stopSegRef = useRef(false); // true once we should stop segmenting and send
+  const capEndRef = useRef(0);      // when the current answer's own cap (30s / 90s) is reached
+  const [introPhase, setIntroPhase] = useState(false);
 
   useEffect(() => {
     api.get(`/public/interview/${token}`)
@@ -72,6 +79,7 @@ export default function Interview() {
   }, [token]);
 
   const stopAll = () => {
+    stopSegRef.current = true;
     clearTimeout(timerRef.current); clearInterval(countRef.current); clearInterval(overallRef.current);
     try { recRef.current && recRef.current.state !== 'inactive' && recRef.current.stop(); } catch { /* */ }
     try { streamRef.current && streamRef.current.getTracks().forEach((t) => t.stop()); } catch { /* */ }
@@ -85,7 +93,23 @@ export default function Interview() {
       a.play().catch(resolve);
     });
 
-  const beginRecording = () => {
+  // Record an answer. The self-introduction may run up to 90s, recorded in <=30s segments (Sarvam
+  // transcribes a clip at most 30s); later answers are a single short segment.
+  const beginRecording = (isIntro = false) => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    introModeRef.current = isIntro;
+    stopSegRef.current = false;
+    segBlobsRef.current = [];
+    capEndRef.current = Date.now() + (isIntro ? INTRO_MS : MAX_ANSWER_MS);
+    setIntroPhase(isIntro);
+    setPhase('recording');
+    setSecs(0);
+    countRef.current = setInterval(() => setSecs((s) => s + 1), 1000);
+    startSegment();
+  };
+
+  const startSegment = () => {
     const stream = streamRef.current;
     if (!stream) return;
     const audioStream = new MediaStream(stream.getAudioTracks());
@@ -94,26 +118,49 @@ export default function Interview() {
     const rec = mime ? new MediaRecorder(audioStream, { mimeType: mime }) : new MediaRecorder(audioStream);
     chunksRef.current = [];
     rec.ondataavailable = (e) => e.data && e.data.size && chunksRef.current.push(e.data);
-    rec.onstop = () => sendAnswer(new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' }));
+    rec.onstop = () => {
+      if (chunksRef.current.length) {
+        segBlobsRef.current.push(new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' }));
+      }
+      const past = Date.now() >= capEndRef.current;
+      if (!stopSegRef.current && introModeRef.current && !past) {
+        startSegment(); // keep recording the intro in the next <=30s segment
+      } else {
+        finishRecording();
+      }
+    };
     recRef.current = rec;
     rec.start();
-    setPhase('recording');
-    setSecs(0);
-    countRef.current = setInterval(() => setSecs((s) => s + 1), 1000);
-    timerRef.current = setTimeout(() => stopRecording(), MAX_ANSWER_MS);
+    // Stop this segment at 30s, or sooner if the overall cap is closer.
+    const segMs = Math.min(SEGMENT_MS, Math.max(1000, capEndRef.current - Date.now()));
+    timerRef.current = setTimeout(() => {
+      try { if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop(); } catch { /* */ }
+    }, segMs);
   };
 
+  // User clicked "Done", the per-answer cap was hit, or the 5-minute clock ran out.
   const stopRecording = () => {
+    stopSegRef.current = true;
     clearTimeout(timerRef.current); clearInterval(countRef.current);
-    try { if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop(); } catch { /* */ }
+    try {
+      if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop();
+      else finishRecording();
+    } catch { finishRecording(); }
   };
 
-  const sendAnswer = async (blob) => {
+  const finishRecording = () => {
+    clearTimeout(timerRef.current); clearInterval(countRef.current);
+    sendAnswer(segBlobsRef.current.slice());
+  };
+
+  const sendAnswer = async (blobs) => {
     setPhase('processing');
     try {
       const form = new FormData();
-      const ext = (blob.type.includes('ogg')) ? 'ogg' : 'webm';
-      form.append('audio', blob, `answer.${ext}`);
+      (blobs || []).forEach((blob, i) => {
+        const ext = (blob.type.includes('ogg')) ? 'ogg' : 'webm';
+        form.append('audio', blob, `answer_${i}.${ext}`);
+      });
       const res = await api.upload(`/public/interview/${token}/answer`, form);
       if (res.transcript) setTranscript((t) => [...t, { q: prompt, a: res.transcript }]);
       if (res.done) {
@@ -124,7 +171,7 @@ export default function Interview() {
       } else {
         setPrompt(res.text || '');
         await playAudio(res.audio);
-        beginRecording();
+        beginRecording(false);
       }
     } catch (e) {
       setError(e.message);
@@ -162,7 +209,7 @@ export default function Interview() {
       const res = await api.post(`/public/interview/${token}/start`);
       setPrompt(res.text || '');
       await playAudio(res.audio);
-      beginRecording();
+      beginRecording(true);   // first recording is the self-introduction (up to 90s)
     } catch (e) {
       setError(e.message || 'Could not start the interview.');
       setPhase('intro');
@@ -230,22 +277,30 @@ export default function Interview() {
             <video id="iv-video" autoPlay playsInline muted />
             <div className="iv-badge">
               <span className={`iv-dot ${phase === 'recording' ? 'rec' : phase === 'speaking' ? 'ai' : ''}`} />
-              {phase === 'speaking' ? 'Interviewer is speaking…' : phase === 'recording' ? 'Recording your answer' : 'Processing…'}
+              {phase === 'speaking' ? 'Interviewer is speaking…'
+                : phase === 'recording' ? (introPhase ? 'Recording your introduction' : 'Recording your answer')
+                : 'Processing…'}
             </div>
             <div className="iv-timer">
-              {phase === 'recording' ? `${Math.max(0, 30 - secs)}s` : mmss(left)}
+              {phase === 'recording' ? `${Math.max(0, (introPhase ? 90 : 30) - secs)}s` : mmss(left)}
             </div>
           </div>
           <div className="iv-body">
             <div className="iv-prompt">{prompt}</div>
             <div className="iv-row">
-              {phase === 'recording' && <button className="primary" onClick={stopRecording}>Done answering</button>}
+              {phase === 'recording' && (
+                <button className="primary" onClick={stopRecording}>
+                  {introPhase ? 'Done introducing' : 'Done answering'}
+                </button>
+              )}
               {phase === 'speaking' && <span className="sub">Listen to the question…</span>}
               {phase === 'processing' && <span className="sub">One moment…</span>}
             </div>
             <div className="iv-note">
               This interview lasts about 5 minutes — <strong style={{ color: '#cfe0f7' }}>{mmss(left)}</strong> remaining.
-              Keep each answer under 30 seconds; it stops automatically at the limit.
+              {introPhase
+                ? ' Take up to 90 seconds to introduce yourself, then press Done.'
+                : ' Keep each answer brief; it stops automatically at 30 seconds.'}
             </div>
           </div>
         </div>

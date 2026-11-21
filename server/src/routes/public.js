@@ -294,8 +294,9 @@ r.post('/interview/:token/start', async (req, res) => {
   const greeting =
     `Hello ${first}, and welcome to your first-round interview for the ${app.position_applied} role ` +
     `at ${app.company_name}. This will take about five minutes. ` +
-    `To begin, please introduce yourself — tell me about your background and why this role interests you. ` +
-    `After that I will ask you a few questions. Please keep each answer under thirty seconds.`;
+    `To begin, please introduce yourself — tell me about your background, your experience, and why this ` +
+    `role interests you. You have up to about a minute and a half for this. ` +
+    `After that, I will ask you a few questions, and you can keep those answers brief.`;
 
   const voice = await tts(greeting);
   if (voice.error) return res.status(502).json({ error: voice.error });
@@ -319,18 +320,26 @@ r.post('/interview/:token/start', async (req, res) => {
  *  - after each later answer, ask the next question until the 5-minute cap or the questions run out;
  *  - then score the whole transcript and close.
  */
-r.post('/interview/:token/answer', audioUpload.single('audio'), async (req, res) => {
+r.post('/interview/:token/answer', audioUpload.array('audio', 6), async (req, res) => {
   const app = await interviewApp(req.params.token);
   if (!app) return res.status(404).json({ error: 'This interview link is not valid.' });
   if (app.interview_status === 'DONE')
     return res.status(409).json({ error: 'This interview has already been completed.' });
-  if (!req.file) return res.status(400).json({ error: 'No audio was received.' });
+  const files = req.files || [];
+  if (!files.length) return res.status(400).json({ error: 'No audio was received.' });
 
-  const out = await stt(req.file.buffer, req.file.originalname || 'answer.webm', req.file.mimetype);
-  if (out.error) return res.status(502).json({ error: out.error });
+  // The answer may arrive as several <=30s clips (a long self-introduction). Transcribe each
+  // (Sarvam caps a clip at 30s) and join them into the full answer.
+  const parts = [];
+  for (const f of files) {
+    const out = await stt(f.buffer, f.originalname || 'answer.webm', f.mimetype);
+    if (out.error) return res.status(502).json({ error: out.error });
+    if (out.transcript && out.transcript.trim()) parts.push(out.transcript.trim());
+  }
+  const answerText = parts.join(' ');
 
   const transcript = Array.isArray(app.interview_transcript) ? app.interview_transcript : [];
-  transcript.push({ role: 'candidate', text: out.transcript });
+  transcript.push({ role: 'candidate', text: answerText });
 
   // How many questions the candidate has answered so far — the first answer is the self-introduction.
   const answered = transcript.filter((t) => t.role === 'candidate').length;
@@ -374,7 +383,7 @@ r.post('/interview/:token/answer', audioUpload.single('audio'), async (req, res)
   await q(`UPDATE applications SET interview_transcript=$2, updated_at=now() WHERE id=$1`,
           [app.id, JSON.stringify(transcript)]);
 
-  res.json({ transcript: out.transcript, done: false, text: nextQuestion, audio: voice.audio });
+  res.json({ transcript: answerText, done: false, text: nextQuestion, audio: voice.audio });
 });
 
 export default r;
