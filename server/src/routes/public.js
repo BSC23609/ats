@@ -301,10 +301,13 @@ r.post('/interview/:token/start', async (req, res) => {
   const voice = await tts(greeting);
   if (voice.error) return res.status(502).json({ error: voice.error });
 
+  // Reset the clock and the question set every time the interview is (re)started, so a candidate
+  // who opened the link earlier still gets the full 5 minutes and a fresh set of questions.
   await q(
     `UPDATE applications
         SET interview_status='IN_PROGRESS',
-            interview_started_at = COALESCE(interview_started_at, now()),
+            interview_started_at = now(),
+            interview_result = NULL,
             interview_transcript = $2,
             updated_at = now()
       WHERE id=$1`,
@@ -356,8 +359,18 @@ r.post('/interview/:token/answer', audioUpload.array('audio', 6), async (req, re
         jobDescription: app.job_description,
         count: 5,
       });
-    } catch {
-      questions = []; // if generation fails, wrap up after the intro
+    } catch (err) {
+      console.error('interview question generation failed:', err.message);
+      questions = [];
+    }
+    // Never end right after the introduction — fall back to a few standard questions.
+    if (!questions.length) {
+      questions = [
+        `Tell me about a project or task from your experience that is most relevant to the ${app.position_applied} role.`,
+        'What are your key strengths, and where do you feel you still need to grow?',
+        'Why do you want to join us, and what are you looking for in this role?',
+        'What are your salary expectations and your availability to join?',
+      ];
     }
     result = { ...result, questions };
     await q(`UPDATE applications SET interview_result=$2 WHERE id=$1`, [app.id, JSON.stringify(result)]);
