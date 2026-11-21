@@ -42,6 +42,8 @@ const MAX_ANSWER_MS = 30000;               // a normal answer segment
 const INTRO_MS = 90000;                    // the self-introduction can run up to 90 seconds
 const SEGMENT_MS = 30000;                  // each recorded clip is <=30s (Sarvam transcription limit)
 const INTERVIEW_MS = 5 * 60 * 1000;        // the whole first round is capped at 5 minutes
+// A tiny silent WAV played on the first user click, to unlock audio playback on mobile browsers.
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 const mmss = (ms) => {
   const s = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -69,6 +71,18 @@ export default function Interview() {
   const stopSegRef = useRef(false); // true once we should stop segmenting and send
   const capEndRef = useRef(0);      // when the current answer's own cap (30s / 90s) is reached
   const [introPhase, setIntroPhase] = useState(false);
+  const videoRef = useRef(null);
+  const audioElRef = useRef(null);  // one reusable <audio>, unlocked on the start click (mobile autoplay)
+
+  // Attach the webcam stream once the <video> is on screen (it only renders once the interview starts).
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v && streamRef.current && v.srcObject !== streamRef.current) {
+      v.srcObject = streamRef.current;
+      v.muted = true;
+      v.play().catch(() => {});
+    }
+  }, [phase]);
 
   useEffect(() => {
     api.get(`/public/interview/${token}`)
@@ -88,8 +102,11 @@ export default function Interview() {
   const playAudio = (b64) =>
     new Promise((resolve) => {
       if (!b64) return resolve();
-      const a = new Audio('data:audio/wav;base64,' + b64);
-      a.onended = resolve; a.onerror = resolve;
+      const a = audioElRef.current || new Audio();
+      audioElRef.current = a;
+      a.onended = resolve;
+      a.onerror = resolve;
+      a.src = 'data:audio/wav;base64,' + b64;
       a.play().catch(resolve);
     });
 
@@ -182,11 +199,15 @@ export default function Interview() {
 
   const start = async () => {
     setError('');
+    // Unlock audio within this click so the greeting can play on mobile browsers.
+    try {
+      if (!audioElRef.current) audioElRef.current = new Audio();
+      audioElRef.current.src = SILENT_WAV;
+      audioElRef.current.play().catch(() => {});
+    } catch { /* */ }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
-      const v = document.getElementById('iv-video');
-      if (v) { v.srcObject = stream; v.muted = true; v.play().catch(() => {}); }
     } catch {
       setError('We could not access your camera and microphone. Please allow access and reload.');
       return;
@@ -274,7 +295,7 @@ export default function Interview() {
       ) : (
         <div className="iv-card">
           <div className="iv-stage">
-            <video id="iv-video" autoPlay playsInline muted />
+            <video ref={videoRef} id="iv-video" autoPlay playsInline muted />
             <div className="iv-badge">
               <span className={`iv-dot ${phase === 'recording' ? 'rec' : phase === 'speaking' ? 'ai' : ''}`} />
               {phase === 'speaking' ? 'Interviewer is speaking…'
