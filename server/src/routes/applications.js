@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { one, q, tx } from '../db.js';
 import { requireAuth, companyFilter, assertCompanyAccess } from '../auth.js';
 import multer from 'multer';
-import { summariseResume, extractText } from '../services/resume.js';
+import { summariseResume, extractText, rescoreFailed } from '../services/resume.js';
 import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
@@ -305,6 +305,20 @@ r.post('/:id/notify', async (req, res, next) => {
     const result = await notifyHrOfApplication(Number(req.params.id));
     if (!result.sent) return res.status(400).json({ error: result.reason || 'Could not send the email.' });
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Re-score every resume that previously failed (runs in the background, paced to avoid rate limits). */
+r.post('/rescore-failed', async (req, res, next) => {
+  try {
+    const { rows } = await q(
+      `SELECT count(*)::int AS n FROM applications
+         WHERE ai_status = 'FAILED' AND resume_path IS NOT NULL AND COALESCE(ai_attempts, 0) < 8`
+    );
+    rescoreFailed(500).catch((e) => console.error('manual rescore error:', e.message));
+    res.json({ queued: rows[0].n });
   } catch (err) {
     next(err);
   }

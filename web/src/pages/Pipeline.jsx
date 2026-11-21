@@ -231,6 +231,22 @@ export default function Pipeline() {
     }
   };
 
+  // Re-score every resume that previously failed (background, paced to avoid rate limits).
+  const [rescoring, setRescoring] = useState(false);
+  const rescoreFailed = async () => {
+    setRescoring(true);
+    try {
+      const res = await api.post('/applications/rescore-failed');
+      alert(res.queued
+        ? `Re-scoring ${res.queued} resume${res.queued === 1 ? '' : 's'} in the background — scores will appear over the next few minutes. Refresh to see them.`
+        : 'No failed resumes to re-score right now.');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRescoring(false);
+    }
+  };
+
   // Interview report — View (in a modal) and Download (branded HTML, print to PDF).
   const [reportFor, setReportFor] = useState(null);   // full application detail for the report modal
   const [reportBusy, setReportBusy] = useState(null); // id being fetched
@@ -435,6 +451,10 @@ export default function Pipeline() {
           </select>
           <input placeholder="Search name, ref, role…" value={search}
                  onChange={(e) => setSearch(e.target.value)} style={{ width: 220 }} />
+          <button onClick={rescoreFailed} disabled={rescoring}
+                  title="Re-try AI scoring for all resumes that failed (runs in the background)">
+            {rescoring ? 'Re-scoring…' : '↻ Re-score failed'}
+          </button>
           <button onClick={() => setRecOpen(true)}
                   title="Send the AI first-round interview to candidates and see their scores">
             ✨ AI recruiter

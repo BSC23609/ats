@@ -267,6 +267,7 @@ export async function rescoreFailed(limit = 6) {
     return;
   }
 
+  const sleep = (ms) => new Promise((rz) => setTimeout(rz, ms));
   for (const r of rows) {
     try {
       await rescoreApplication(r.id);
@@ -279,5 +280,7 @@ export async function rescoreFailed(limit = 6) {
     if (row && row.ai_status === 'FAILED' && !TRANSIENT_ERR.test(row.ai_error || '')) {
       await q(`UPDATE applications SET ai_attempts = COALESCE(ai_attempts, 0) + 1 WHERE id=$1`, [r.id]).catch(() => {});
     }
+    // Pace the calls so a burst doesn't trip the API rate limit.
+    await sleep(1500);
   }
 }
