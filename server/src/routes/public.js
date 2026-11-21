@@ -293,7 +293,7 @@ r.post('/interview/:token/start', async (req, res) => {
   const first = (app.full_name || '').trim().split(/\s+/)[0] || 'there';
   const greeting =
     `Hello ${first}, and welcome to your first-round interview for the ${app.position_applied} role ` +
-    `at ${app.company_name}. I am your AI interviewer. This will take about five minutes. ` +
+    `at ${app.company_name}. This will take about five minutes. ` +
     `To begin, please introduce yourself — tell me about your background and why this role interests you. ` +
     `After that I will ask you a few questions. Please keep each answer under thirty seconds.`;
 

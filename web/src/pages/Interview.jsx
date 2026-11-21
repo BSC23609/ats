@@ -190,14 +190,14 @@ export default function Interview() {
       <style>{CSS}</style>
       <div className="iv-top">
         <span className="iv-plate"><GroupLogo className="" /></span>
-        <span className="iv-eyebrow">AI First-round Interview</span>
+        <span className="iv-eyebrow">First-round Interview</span>
       </div>
 
       {phase === 'intro' ? (
         <div className="iv-plain" style={{ textAlign: 'left' }}>
           <h1>Hello {info?.full_name?.split(' ')[0]} 👋</h1>
           <p className="sub" style={{ marginTop: 6 }}>
-            This is a short AI-led first-round interview for <strong style={{ color: '#fff' }}>{info?.position_applied}</strong> at {info?.company_name}.
+            This is a short first-round interview for <strong style={{ color: '#fff' }}>{info?.position_applied}</strong> at {info?.company_name}.
           </p>
           <ul className="sub" style={{ lineHeight: 1.9, marginTop: 14 }}>
             <li>You'll be asked to introduce yourself, then answer a few questions.</li>
@@ -230,7 +230,7 @@ export default function Interview() {
             <video id="iv-video" autoPlay playsInline muted />
             <div className="iv-badge">
               <span className={`iv-dot ${phase === 'recording' ? 'rec' : phase === 'speaking' ? 'ai' : ''}`} />
-              {phase === 'speaking' ? 'AI is speaking…' : phase === 'recording' ? 'Recording your answer' : 'Processing…'}
+              {phase === 'speaking' ? 'Interviewer is speaking…' : phase === 'recording' ? 'Recording your answer' : 'Processing…'}
             </div>
             <div className="iv-timer">
               {phase === 'recording' ? `${Math.max(0, 30 - secs)}s` : mmss(left)}

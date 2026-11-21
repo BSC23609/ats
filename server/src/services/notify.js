@@ -236,7 +236,7 @@ export async function emailAiInterview(appId) {
         <p>
           Thank you for applying for <strong>${esc(app.position_applied)}</strong> at
           ${esc(app.company_name)}. As the first step, we would like you to complete a short
-          <strong>AI-led video interview</strong>. It takes about five minutes.
+          <strong>short video interview</strong>. It takes about five minutes.
         </p>
         <p style="margin:6px 0 0"><strong>Before you start:</strong></p>
         <ul style="margin:6px 0 0;padding-left:20px;color:#3a434b">
@@ -247,7 +247,7 @@ export async function emailAiInterview(appId) {
         <p style="margin:22px 0">
           <a href="${link}" style="background:#0a2b66;color:#fff;text-decoration:none;
              padding:12px 22px;border-radius:4px;font-weight:600;display:inline-block">
-            Start your AI interview
+            Start interview
           </a>
         </p>
         <p style="color:#697178;font-size:13px">
@@ -263,7 +263,7 @@ export async function emailAiInterview(appId) {
 
     return await sendMail({
       to: app.email,
-      subject: `Your AI first-round interview (${app.company_code} · ${app.ref_code})`,
+      subject: `Your first-round interview (${app.company_code} · ${app.ref_code})`,
       html,
       replyTo: hrReply,
     });
