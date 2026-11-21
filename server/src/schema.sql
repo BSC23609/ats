@@ -105,7 +105,7 @@ CREATE TABLE applications (
   resume_filename    TEXT,
   resume_text        TEXT,
   ai_summary         JSONB,                          -- see services/resume.js
-  ai_status          TEXT DEFAULT 'PENDING' CHECK (ai_status IN ('PENDING','DONE','FAILED','SKIPPED')),
+  ai_status          TEXT DEFAULT 'PENDING' CHECK (ai_status IN ('PENDING','DONE','FAILED','SKIPPED','NOT_SCORED')),
   ai_error           TEXT,
   notify_status      TEXT,              -- HR-notification email: SENT / FAILED / SKIPPED
   notify_at          TIMESTAMPTZ,

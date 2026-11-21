@@ -172,34 +172,10 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
     // and the outcome is recorded on the row (notify_status) for the pipeline's send-log column.
     notifyHrOfApplication(app.id).catch((e) => console.error('HR notify failed:', e.message));
 
-    // Read the resume and write the overview in the background — the candidate is not kept waiting.
-    if (req.file) {
-      (async () => {
-        try {
-          const text = await extractText(req.file.buffer, req.file.mimetype, req.file.originalname);
-          await q('UPDATE applications SET resume_text=$1 WHERE id=$2', [text, app.id]);
-
-          const job = app.job_id
-            ? await one('SELECT jd_text, description, min_experience, max_experience FROM jobs WHERE id=$1', [app.job_id])
-            : null;
-          await summariseResume(app.id, {
-            resumeText: text,
-            position: app.position_applied,
-            company: company.name,
-            experience: app.total_experience,
-            // An uploaded JD document wins; otherwise score against what HR wrote on the opening.
-            jobDescription: job?.jd_text || toText(job?.description),
-            experienceRange: describeRange(job?.min_experience, job?.max_experience),
-          });
-        } catch (err) {
-          console.error('resume processing failed:', err.message);
-          await q(`UPDATE applications SET ai_status='FAILED', ai_error=$2 WHERE id=$1`,
-                  [app.id, err.message.slice(0, 300)]);
-        }
-      })();
-    } else {
-      await q(`UPDATE applications SET ai_status='SKIPPED' WHERE id=$1`, [app.id]);
-    }
+    // Scoring is on-demand: we do NOT auto-read/score the resume. HR scores from the pipeline when
+    // they choose to, which keeps AI usage deliberate. Mark the row so the pipeline shows a Score button.
+    await q(`UPDATE applications SET ai_status=$2 WHERE id=$1`,
+            [app.id, req.file ? 'NOT_SCORED' : 'SKIPPED']);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

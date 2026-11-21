@@ -9,7 +9,6 @@ import { employees, jobs, users } from './routes/admin.js';
 import { describeStorage } from './services/storage.js';
 import { checkGraph } from './services/graph.js';
 import { isInitialised, initDb, syncCompanies, migrate } from './init-db.js';
-import { rescoreFailed } from './services/resume.js';
 import { q } from './db.js';
 
 dotenv.config();
@@ -124,10 +123,6 @@ const port = process.env.PORT || 4000;
 app.listen(port, async () => {
   console.log(`ATS API listening on ${port}`);
   await bootstrap();
-
-  // Self-healing: re-score any resumes that previously failed (e.g. a busy API, or a key that was
-  // briefly out of credit). Runs shortly after boot and periodically while the service is awake.
-  const sweep = () => rescoreFailed().catch((e) => console.error('rescore sweep error:', e.message));
-  setTimeout(sweep, 20_000);
-  setInterval(sweep, 10 * 60_000);
+  // Scoring is on-demand: no automatic background sweep. HR scores resumes from the pipeline
+  // (per candidate, or "Re-score failed" for a batch), so all AI usage is deliberate.
 });

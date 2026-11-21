@@ -73,7 +73,7 @@ r.post('/', resumeUpload.single('resume'), async (req, res) => {
           [b.area, b.city, b.pincode].map((x) => (x || '').trim()).filter(Boolean).join(', ') || null,
           (b.area || '').trim() || null, (b.city || '').trim() || null, (b.pincode || '').trim() || null,
           b.total_experience || 0, b.current_ctc || null, b.expected_ctc || null, b.notice_period_days || null,
-          'manual', resumeKey, req.file?.originalname || null, req.file ? 'PENDING' : 'SKIPPED', status,
+          'manual', resumeKey, req.file?.originalname || null, req.file ? 'NOT_SCORED' : 'SKIPPED', status,
         ]
       );
       const created = rows[0];
@@ -86,30 +86,7 @@ r.post('/', resumeUpload.single('resume'), async (req, res) => {
     });
 
     res.status(201).json({ id: app.id, ref_code: app.ref_code });
-
-    // Read + score the resume in the background, same as a careers application.
-    if (req.file) {
-      (async () => {
-        try {
-          const text = await extractText(req.file.buffer, req.file.mimetype, req.file.originalname);
-          await q('UPDATE applications SET resume_text=$1 WHERE id=$2', [text, app.id]);
-          const job = app.job_id
-            ? await one('SELECT jd_text, description, min_experience, max_experience FROM jobs WHERE id=$1', [app.job_id])
-            : null;
-          await summariseResume(app.id, {
-            resumeText: text,
-            position: app.position_applied,
-            company: company.name,
-            experience: app.total_experience,
-            jobDescription: job?.jd_text || toText(job?.description),
-            experienceRange: describeRange(job?.min_experience, job?.max_experience),
-          });
-        } catch (err) {
-          await q(`UPDATE applications SET ai_status='FAILED', ai_error=$2 WHERE id=$1`,
-                  [app.id, err.message.slice(0, 300)]);
-        }
-      })();
-    }
+    // Scoring is on-demand — HR scores from the pipeline when they choose to.
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -833,7 +833,14 @@ export default function Pipeline() {
                                 onClick={(e) => { e.stopPropagation(); setResumeFor({ id: a.id, name: a.resume_filename }); }}>
                           View resume
                         </button>
-                        {(a.ai_status === 'FAILED' || a.ai_status === 'SKIPPED') && (
+                        {(a.ai_status === 'NOT_SCORED' || a.ai_status === 'SKIPPED') && (
+                          <button className="ghost small"
+                                  title="Run AI scoring for this resume now"
+                                  onClick={(e) => { e.stopPropagation(); retryScore(a.id); }}>
+                            ✨ Score
+                          </button>
+                        )}
+                        {a.ai_status === 'FAILED' && (
                           <button className="ghost small"
                                   onClick={(e) => { e.stopPropagation(); retryScore(a.id); }}>
                             Retry
