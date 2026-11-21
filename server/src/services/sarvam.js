@@ -25,7 +25,7 @@ export async function tts(text, opts = {}) {
         text: clean.slice(0, 1400),
         target_language_code: opts.language_code || 'en-IN',
         speaker: opts.speaker || 'anushka',
-        model: opts.model || 'bulbul:v2',
+        model: opts.model || 'bulbul:v3',
         pace: 1.0,
         speech_sample_rate: 22050,
       }),
