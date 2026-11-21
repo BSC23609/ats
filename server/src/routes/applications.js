@@ -292,7 +292,8 @@ r.post('/rescore-failed', async (req, res, next) => {
   try {
     const { rows } = await q(
       `SELECT count(*)::int AS n FROM applications
-         WHERE ai_status = 'FAILED' AND resume_path IS NOT NULL AND COALESCE(ai_attempts, 0) < 8`
+         WHERE ai_status IN ('FAILED', 'PENDING', 'NOT_SCORED', 'SKIPPED')
+           AND resume_path IS NOT NULL AND COALESCE(ai_attempts, 0) < 8`
     );
     rescoreFailed(500).catch((e) => console.error('manual rescore error:', e.message));
     res.json({ queued: rows[0].n });

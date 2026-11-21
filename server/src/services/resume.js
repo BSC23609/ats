@@ -269,7 +269,9 @@ export async function rescoreFailed(limit = 6) {
   try {
     ({ rows } = await q(
       `SELECT id FROM applications
-         WHERE ai_status = 'FAILED' AND resume_path IS NOT NULL AND COALESCE(ai_attempts, 0) < 8
+         WHERE ai_status IN ('FAILED', 'PENDING', 'NOT_SCORED', 'SKIPPED')
+           AND resume_path IS NOT NULL
+           AND COALESCE(ai_attempts, 0) < 8
          ORDER BY updated_at ASC NULLS FIRST
          LIMIT $1`,
       [limit]
