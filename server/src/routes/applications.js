@@ -7,7 +7,7 @@ import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
 import { syncWorkbook } from '../services/workbook.js';
-import { notifyHrOfApplication, emailAiInterview, emailJoiningForm } from '../services/notify.js';
+import { notifyHrOfApplication, emailAiInterview, emailJoiningForm, fileAndEmailApplicationForm } from '../services/notify.js';
 import { askRecruiter } from '../services/recruiter.js';
 
 const r = Router();
@@ -548,6 +548,19 @@ r.post('/:id/assign', async (req, res) => {
     req.params.id,
   ]);
   res.json({ ok: true });
+});
+
+/** File the submitted application form to OneDrive (Employee Master Data Report) and email it to
+ *  HR, on demand — for forms submitted before this was automatic, or to re-file/re-send. */
+r.post('/:id/file-form', async (req, res) => {
+  const app = await one('SELECT company_id, stage2_submitted_at FROM applications WHERE id=$1', [req.params.id]);
+  if (!app) return res.status(404).json({ error: 'Application not found.' });
+  if (!assertCompanyAccess(req, res, app.company_id)) return;
+  if (!app.stage2_submitted_at)
+    return res.status(400).json({ error: 'This candidate has not submitted the full application form yet.' });
+
+  const out = await fileAndEmailApplicationForm(req.params.id);
+  res.json(out);
 });
 
 /** Let HR reopen a submitted form (candidate made a mistake, or details changed). */

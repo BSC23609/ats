@@ -221,6 +221,19 @@ export default function ApplicationDetail() {
   const [offer, setOffer] = useState({ offer_designation: '', offered_ctc: '', offer_joining_date: '' });
   const [offerFile, setOfferFile] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [filing, setFiling] = useState(false);
+
+  const fileForm = async () => {
+    setFiling(true); setMsg(''); setError('');
+    try {
+      const out = await api.post(`/applications/${id}/file-form`);
+      if (out.saved && out.sent) setMsg('Form filed to OneDrive (Employee Master Data Report) and emailed to HR.');
+      else if (out.saved) setMsg(`Form filed to OneDrive. Email not sent${out.reason ? `: ${out.reason}` : ''}.`);
+      else if (out.sent) setMsg(`Form emailed to HR. OneDrive save failed${out.reason ? `: ${out.reason}` : ''}.`);
+      else setError(`Could not file or email the form${out.reason ? `: ${out.reason}` : ''}.`);
+    } catch (err) { setError(err.message); }
+    finally { setFiling(false); }
+  };
 
   const load = () => api.get(`/applications/${id}`).then(setApp).catch((e) => setError(e.message));
   useEffect(() => { load(); }, [id]);
@@ -399,8 +412,11 @@ export default function ApplicationDetail() {
 
           <Section title="Full application form">
             {app.stage2_submitted_at ? (
-              <div className="row">
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                 <span className="chip JOINED">Submitted {date(app.stage2_submitted_at)}</span>
+                <button className="ghost small" onClick={fileForm} disabled={filing}>
+                  {filing ? 'Filing…' : 'File to OneDrive & email HR'}
+                </button>
                 <button className="ghost small"
                         onClick={async () => { await api.post(`/applications/${id}/reopen-form`); load(); }}>
                   Reopen for editing
