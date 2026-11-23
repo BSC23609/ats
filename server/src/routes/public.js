@@ -3,7 +3,7 @@ import path from 'path';
 import multer from 'multer';
 import { one, q, tx } from '../db.js';
 import { extractText, summariseResume } from '../services/resume.js';
-import { notifyHrOfApplication } from '../services/notify.js';
+import { notifyHrOfApplication, fileAndEmailApplicationForm } from '../services/notify.js';
 import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
@@ -216,6 +216,15 @@ r.post('/form/:token', async (req, res) => {
     [app.id]
   );
   res.json({ ok: true });
+
+  // File the completed form in OneDrive (ATS / Employee Master Data Report) and email it to HR.
+  // Fire-and-forget: a slow OneDrive or mail send must not hold up the candidate's submit.
+  fileAndEmailApplicationForm(app.id)
+    .then((out) => {
+      if (!out.saved) console.error('application form not filed:', out.reason);
+      if (!out.sent) console.error('application form not emailed to HR:', out.reason);
+    })
+    .catch((e) => console.error('application form file/email error:', e.message));
 });
 
 /* ---------------- AI video interview (first round) ---------------- */

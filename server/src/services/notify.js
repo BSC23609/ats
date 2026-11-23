@@ -1,6 +1,7 @@
 import { one, q } from '../db.js';
 import { sendMail, graphConfigured } from './graph.js';
-import { getFile } from './storage.js';
+import { getFile, putFile } from './storage.js';
+import { renderApplicationFormHtml, applicationFormKey, applicationFormFilename } from './appform.js';
 
 const MIME = {
   '.pdf': 'application/pdf',
@@ -330,5 +331,93 @@ export async function emailAiInterview(appId) {
     });
   } catch (err) {
     return { sent: false, reason: err.message };
+  }
+}
+
+/**
+ * When a candidate submits their full application form: render it as a document, file it in
+ * OneDrive under "Employee Master Data Report", and email it to HR with the form attached.
+ * Fire-and-forget from the submit route — returns { sent, saved, reason }; never throws.
+ */
+export async function fileAndEmailApplicationForm(appId) {
+  try {
+    const app = await one(
+      `SELECT a.*, c.code AS company_code, c.name AS company_name
+         FROM applications a JOIN companies c ON c.id = a.company_id
+        WHERE a.id = $1`,
+      [appId]
+    );
+    if (!app) return { sent: false, saved: false, reason: 'Application not found.' };
+
+    const details = app.details || {};
+    const html = renderApplicationFormHtml(app, details);
+    const buffer = Buffer.from(html, 'utf8');
+
+    // 1) File it in OneDrive: ATS/Employee Master Data Report/<name>_<ref>.html (folder auto-created).
+    let saved = false;
+    let saveError = null;
+    try {
+      await putFile(applicationFormKey(app), buffer, 'text/html; charset=utf-8');
+      saved = true;
+    } catch (e) {
+      saveError = e.message;
+      console.error('application form OneDrive save failed:', e.message);
+    }
+
+    // 2) Email it to HR, with the form attached.
+    let sent = false;
+    let sendReason = null;
+    if (!graphConfigured()) {
+      sendReason = 'Email not configured.';
+    } else {
+      const { rows } = await q(
+        `SELECT DISTINCT u.email
+           FROM users u JOIN user_companies uc ON uc.user_id = u.id
+          WHERE uc.company_id = $1 AND u.active AND u.email IS NOT NULL AND u.email <> ''`,
+        [app.company_id]
+      );
+      const extra = (process.env.NOTIFY_EMAILS || '').split(',').map((s) => s.trim()).filter(Boolean);
+      let recipients = [...new Set([...rows.map((r) => r.email), ...extra])];
+      if (!recipients.length) recipients = ['hr@bharatsteels.in'];
+
+      const base = (process.env.PUBLIC_WEB_URL || '').replace(/\/+$/, '');
+      const link = base ? `${base}/applications/${app.id}` : null;
+
+      const body = `
+        <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#101519">
+          <p style="font-size:15px;margin:0 0 4px"><strong>Application form submitted</strong></p>
+          <p style="color:#697178;margin:0 0 16px">
+            ${esc(app.full_name)} (${esc(app.ref_code)}, ${esc(app.company_name)}) has completed their full
+            application form. A copy is attached, and it is filed in OneDrive under
+            <strong>ATS / Employee Master Data Report</strong>.
+          </p>
+          ${link
+            ? `<p style="margin:0 0 18px">
+                 <a href="${link}" style="background:#0064a0;color:#fff;text-decoration:none;
+                    padding:10px 18px;border-radius:4px;font-weight:600;display:inline-block">Open in the ATS</a>
+               </p>`
+            : ''}
+          <p style="color:#8b939a;font-size:12px;margin:0">Sent automatically by the Bharat Steel Group recruitment portal.</p>
+        </div>`;
+
+      const result = await sendMail({
+        to: recipients,
+        subject: `Application form — ${app.full_name} (${app.company_code} · ${app.ref_code})`,
+        html: body,
+        replyTo: app.email,
+        attachments: [{
+          name: applicationFormFilename(app),
+          contentType: 'text/html',
+          contentBytes: buffer.toString('base64'),
+        }],
+        from: process.env.NOTIFY_FROM || undefined,
+      });
+      sent = !!result.sent;
+      sendReason = result.reason || null;
+    }
+
+    return { sent, saved, reason: sendReason || saveError || null };
+  } catch (err) {
+    return { sent: false, saved: false, reason: err.message };
   }
 }
