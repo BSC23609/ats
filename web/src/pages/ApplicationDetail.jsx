@@ -395,8 +395,8 @@ export default function ApplicationDetail() {
             ) : (
               <>
                 <p style={{ marginTop: 0 }}>
-                  Send this link to the candidate on interview day. It opens the full application form, already tagged
-                  to {app.full_name}.
+                  This link is emailed to the candidate automatically once they are marked <b>Joined</b>. You can
+                  also share it directly — it opens the full application form, already tagged to {app.full_name}.
                 </p>
                 <div className="linkbox">
                   <span style={{ flex: 1 }}>{app.form_link}</span>
@@ -467,8 +467,8 @@ export default function ApplicationDetail() {
 
               {move.status === 'JOINED' && !app.stage2_submitted_at && (
                 <div className="note" style={{ marginBottom: 12 }}>
-                  The candidate has not submitted the full application form. Send them the form link before marking
-                  them joined — the employee record is built from that form.
+                  When you mark this candidate joined, their full application form link is emailed to them
+                  automatically so they can complete their joining details.
                 </div>
               )}
 

@@ -210,6 +210,67 @@ export async function emailInterviewForm(appId) {
   }
 }
 
+/**
+ * Email the new joiner their full application form link, as onboarding — sent when HR marks the
+ * candidate JOINED. Same secure /form/{token} link, but welcome-worded (no interview mention).
+ * Returns { sent, reason }; never throws.
+ */
+export async function emailJoiningForm(appId) {
+  try {
+    const app = await one(
+      `SELECT a.*, c.code AS company_code, c.name AS company_name
+         FROM applications a JOIN companies c ON c.id = a.company_id
+        WHERE a.id = $1`,
+      [appId]
+    );
+    if (!app) return { sent: false, reason: 'Application not found.' };
+    if (!app.email) return { sent: false, reason: 'Candidate has no email on file.' };
+    if (!graphConfigured()) return { sent: false, reason: 'Email not configured.' };
+
+    const base = (process.env.PUBLIC_WEB_URL || '').replace(/\/+$/, '');
+    if (!base) return { sent: false, reason: 'PUBLIC_WEB_URL is not set.' };
+    const link = `${base}/form/${app.stage2_token}`;
+
+    const hrReply = process.env.GRAPH_MAIL_FROM || process.env.GRAPH_DRIVE_USER || 'hr@bharatsteels.in';
+
+    const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#101519">
+        <p>Dear ${esc(app.full_name)},</p>
+        <p>
+          Welcome to <strong>${esc(app.company_name)}</strong>. We are glad to have you on board as
+          <strong>${esc(app.position_applied)}</strong>.
+        </p>
+        <p>
+          To complete your joining formalities, please fill in your full application form using the
+          secure link below. It only takes a few minutes, and the details go straight to our HR records.
+        </p>
+        <p style="margin:22px 0">
+          <a href="${link}" style="background:#0064a0;color:#fff;text-decoration:none;
+             padding:12px 22px;border-radius:4px;font-weight:600;display:inline-block">
+            Complete your joining form
+          </a>
+        </p>
+        <p style="color:#697178;font-size:13px">
+          Or paste this link into your browser:<br>
+          <a href="${link}">${link}</a>
+        </p>
+        <p style="color:#697178;font-size:13px;margin-top:20px">
+          Reference: ${esc(app.ref_code)}. If you have any questions, simply reply to this email.
+        </p>
+        <p>Warm regards,<br>HR Team, ${esc(app.company_name)}</p>
+      </div>`;
+
+    return await sendMail({
+      to: app.email,
+      subject: `Welcome aboard — complete your joining form (${app.company_code} · ${app.ref_code})`,
+      html,
+      replyTo: hrReply,
+    });
+  } catch (err) {
+    return { sent: false, reason: err.message };
+  }
+}
+
 /** Email the candidate their private AI first-round interview link. */
 export async function emailAiInterview(appId) {
   try {

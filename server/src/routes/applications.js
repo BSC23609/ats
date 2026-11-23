@@ -7,7 +7,7 @@ import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
 import { syncWorkbook } from '../services/workbook.js';
-import { notifyHrOfApplication, emailInterviewForm, emailAiInterview } from '../services/notify.js';
+import { notifyHrOfApplication, emailAiInterview, emailJoiningForm } from '../services/notify.js';
 import { askRecruiter } from '../services/recruiter.js';
 
 const r = Router();
@@ -363,10 +363,8 @@ r.post('/:id/status', async (req, res) => {
   // a second employee record, or a repeat email.
   if (status === app.status) return res.json({ ok: true, unchanged: true });
 
-  if (status === 'JOINED' && !app.stage2_submitted_at)
-    return res.status(400).json({
-      error: 'The candidate has not submitted the full application form yet. Send them the form link first.',
-    });
+  // The full application form is now collected AFTER joining (it's emailed on JOINED below), so
+  // submitting it is no longer a precondition for marking someone JOINED.
 
   const result = await tx(async (client) => {
     await client.query(
@@ -428,14 +426,8 @@ r.post('/:id/status', async (req, res) => {
 
   res.json({ ok: true, employee: result });
 
-  // Moving a candidate to Office Interview emails THEM their full-application-form link, with the
-  // interview date HR just set. Fire-and-forget — a slow mail send must not fail the HR click,
-  // and a bad candidate address is logged, not surfaced.
-  if (status === 'OFFICE_INTERVIEW') {
-    emailInterviewForm(app.id)
-      .then((out) => { if (!out.sent) console.error('interview email not sent:', out.reason); })
-      .catch((e) => console.error('interview email error:', e.message));
-  }
+  // The full application form is sent to the candidate as onboarding, once they are marked JOINED
+  // (see below), not at the office-interview stage.
 
   // Moving a candidate to the Accepted stage automatically sends them the AI first-round
   // interview link and marks it invited. Fire-and-forget, same as above.
@@ -453,9 +445,15 @@ r.post('/:id/status', async (req, res) => {
       .catch((e) => console.error('AI interview email error:', e.message));
   }
 
-  // A new employee record means the master workbook is out of date. Fire-and-forget:
-  // OneDrive being slow must not make the HR admin's click fail.
-  if (status === 'JOINED') syncWorkbook();
+  // On JOINED: email the new joiner their full application form link (onboarding paperwork), and
+  // refresh the master workbook. Both fire-and-forget — a slow send or OneDrive must not fail the
+  // HR admin's click, and a bad candidate address is logged, not surfaced.
+  if (status === 'JOINED') {
+    emailJoiningForm(app.id)
+      .then((out) => { if (!out.sent) console.error('joining form email not sent:', out.reason); })
+      .catch((e) => console.error('joining form email error:', e.message));
+    syncWorkbook();
+  }
 });
 
 /* Offer letters are written, signed and SENT outside this system — by email, by hand, however HR
