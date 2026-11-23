@@ -1,7 +1,7 @@
 import { one, q } from '../db.js';
 import { sendMail, graphConfigured } from './graph.js';
 import { getFile, putFile } from './storage.js';
-import { renderApplicationFormHtml, applicationFormKey, applicationFormFilename } from './appform.js';
+import { renderApplicationFormPdf, applicationFormKey, applicationFormFilename } from './appform.js';
 
 const MIME = {
   '.pdf': 'application/pdf',
@@ -350,14 +350,13 @@ export async function fileAndEmailApplicationForm(appId) {
     if (!app) return { sent: false, saved: false, reason: 'Application not found.' };
 
     const details = app.details || {};
-    const html = renderApplicationFormHtml(app, details);
-    const buffer = Buffer.from(html, 'utf8');
+    const buffer = await renderApplicationFormPdf(app, details);
 
-    // 1) File it in OneDrive: ATS/Employee Master Data Report/<name>_<ref>.html (folder auto-created).
+    // 1) File it in OneDrive: ATS/Employee Master Data Report/<name>_<ref>.pdf (folder auto-created).
     let saved = false;
     let saveError = null;
     try {
-      await putFile(applicationFormKey(app), buffer, 'text/html; charset=utf-8');
+      await putFile(applicationFormKey(app), buffer, 'application/pdf');
       saved = true;
     } catch (e) {
       saveError = e.message;
@@ -407,7 +406,7 @@ export async function fileAndEmailApplicationForm(appId) {
         replyTo: app.email,
         attachments: [{
           name: applicationFormFilename(app),
-          contentType: 'text/html',
+          contentType: 'application/pdf',
           contentBytes: buffer.toString('base64'),
         }],
         from: process.env.NOTIFY_FROM || undefined,
