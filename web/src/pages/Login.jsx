@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../api.jsx';
 import ForgotPassword from './ForgotPassword.jsx';
@@ -52,6 +52,12 @@ export default function Login() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
+
+  // Inside the group hub's tab: tell the hub this app is asking for a sign-in, so it opens ATS in its own tab.
+  useEffect(() => {
+    if (loading || user) return;
+    try { if (window.top !== window.self) window.parent.postMessage({ bsg: 'login' }, '*'); } catch (e) { /* ignore */ }
+  }, [loading, user]);
 
   if (loading) return <div className="center">Loading…</div>;
   if (user) return <Navigate to="/pipeline" replace />;
