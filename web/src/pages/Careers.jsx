@@ -12,6 +12,7 @@ export default function Careers() {
   const [done, setDone] = useState(null);
   const [params] = useSearchParams();
   const [missing, setMissing] = useState(false); // a shared link points at a role that no longer exists
+  const [fresher, setFresher] = useState(false); // a fresher has no current salary to enter
 
   useEffect(() => {
     api.get('/public/openings').then(setOpenings).catch((e) => setError(e.message));
@@ -217,8 +218,18 @@ export default function Careers() {
 
             <div className="field-row">
               <div className="field">
-                <label htmlFor="current_ctc">Current annual salary (₹)</label>
-                <input id="current_ctc" name="current_ctc" type="number" min="0" />
+                <label htmlFor="current_salary_type">Current annual salary (₹)</label>
+                <select id="current_salary_type" value={fresher ? 'Fresher' : 'Experienced'}
+                        onChange={(e) => setFresher(e.target.value === 'Fresher')}>
+                  <option value="Experienced">Experienced</option>
+                  <option value="Fresher">Fresher — no current salary</option>
+                </select>
+                {fresher ? (
+                  <input type="hidden" name="current_ctc" value="0" />
+                ) : (
+                  <input id="current_ctc" name="current_ctc" type="number" min="0"
+                         placeholder="e.g. 300000" style={{ marginTop: 8 }} />
+                )}
               </div>
               <div className="field">
                 <label htmlFor="expected_ctc">Expected annual salary (₹)</label>
