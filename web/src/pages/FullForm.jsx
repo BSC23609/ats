@@ -3,6 +3,42 @@ import { useParams } from 'react-router-dom';
 import { api } from '../api.jsx';
 import { CompanyLogo } from '../components/Logo.jsx';
 
+// Relationship options for an emergency contact (family members).
+const RELATIONSHIPS = [
+  'Father', 'Mother', 'Husband', 'Wife', 'Son', 'Daughter', 'Brother', 'Sister',
+  'Grandfather', 'Grandmother', 'Father-in-law', 'Mother-in-law', 'Brother-in-law',
+  'Sister-in-law', 'Uncle', 'Aunt', 'Guardian', 'Other',
+];
+
+// Nationalities (demonyms). Indian is the default selection.
+const NATIONALITIES = [
+  'Afghan', 'Albanian', 'Algerian', 'American', 'Andorran', 'Angolan', 'Antiguan', 'Argentine',
+  'Armenian', 'Australian', 'Austrian', 'Azerbaijani', 'Bahamian', 'Bahraini', 'Bangladeshi',
+  'Barbadian', 'Belarusian', 'Belgian', 'Belizean', 'Beninese', 'Bhutanese', 'Bolivian', 'Bosnian',
+  'Botswanan', 'Brazilian', 'British', 'Bruneian', 'Bulgarian', 'Burkinabe', 'Burmese', 'Burundian',
+  'Cambodian', 'Cameroonian', 'Canadian', 'Cape Verdean', 'Central African', 'Chadian', 'Chilean',
+  'Chinese', 'Colombian', 'Comoran', 'Congolese', 'Costa Rican', 'Croatian', 'Cuban', 'Cypriot',
+  'Czech', 'Danish', 'Djiboutian', 'Dominican', 'Dutch', 'East Timorese', 'Ecuadorean', 'Egyptian',
+  'Emirati', 'Equatorial Guinean', 'Eritrean', 'Estonian', 'Ethiopian', 'Fijian', 'Filipino',
+  'Finnish', 'French', 'Gabonese', 'Gambian', 'Georgian', 'German', 'Ghanaian', 'Greek', 'Grenadian',
+  'Guatemalan', 'Guinean', 'Guinea-Bissauan', 'Guyanese', 'Haitian', 'Honduran', 'Hungarian',
+  'Icelandic', 'Indian', 'Indonesian', 'Iranian', 'Iraqi', 'Irish', 'Israeli', 'Italian', 'Ivorian',
+  'Jamaican', 'Japanese', 'Jordanian', 'Kazakh', 'Kenyan', 'Kiribati', 'Kosovar', 'Kuwaiti', 'Kyrgyz',
+  'Laotian', 'Latvian', 'Lebanese', 'Liberian', 'Libyan', 'Liechtensteiner', 'Lithuanian',
+  'Luxembourger', 'Macedonian', 'Malagasy', 'Malawian', 'Malaysian', 'Maldivian', 'Malian', 'Maltese',
+  'Marshallese', 'Mauritanian', 'Mauritian', 'Mexican', 'Micronesian', 'Moldovan', 'Monégasque',
+  'Mongolian', 'Montenegrin', 'Moroccan', 'Mozambican', 'Namibian', 'Nauruan', 'Nepali',
+  'New Zealander', 'Nicaraguan', 'Nigerien', 'Nigerian', 'North Korean', 'Norwegian', 'Omani',
+  'Pakistani', 'Palauan', 'Palestinian', 'Panamanian', 'Papua New Guinean', 'Paraguayan', 'Peruvian',
+  'Polish', 'Portuguese', 'Qatari', 'Romanian', 'Russian', 'Rwandan', 'Saint Lucian', 'Salvadoran',
+  'Samoan', 'San Marinese', 'Saudi', 'Senegalese', 'Serbian', 'Seychellois', 'Sierra Leonean',
+  'Singaporean', 'Slovak', 'Slovenian', 'Solomon Islander', 'Somali', 'South African', 'South Korean',
+  'South Sudanese', 'Spanish', 'Sri Lankan', 'Sudanese', 'Surinamese', 'Swazi', 'Swedish', 'Swiss',
+  'Syrian', 'Taiwanese', 'Tajik', 'Tanzanian', 'Thai', 'Togolese', 'Tongan', 'Trinidadian', 'Tunisian',
+  'Turkish', 'Turkmen', 'Tuvaluan', 'Ugandan', 'Ukrainian', 'Uruguayan', 'Uzbek', 'Vanuatuan',
+  'Venezuelan', 'Vietnamese', 'Yemeni', 'Zambian', 'Zimbabwean', 'Other',
+];
+
 /* Repeatable table blocks — children, siblings, emergency contacts, education, employment */
 function Rows({ label, cols, rows, setRows, blank, min = 1 }) {
   const update = (i, key, value) => setRows(rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
@@ -73,6 +109,7 @@ export default function FullForm() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [marital, setMarital] = useState('');     // controls whether spouse/children fields show
 
   const [children, setChildren] = useState([{ name: '', dob: '' }]);
   const [siblings, setSiblings] = useState([{ relation: '', age: '', gender: '', occupation: '', marital: '' }]);
@@ -168,7 +205,7 @@ export default function FullForm() {
                          options={['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']} />
           </div>
           <div className="field-row">
-            <SelectField id="nationality" label="Nationality" req options={['Indian', 'Other']} defaultValue="Indian" />
+            <SelectField id="nationality" label="Nationality" req options={NATIONALITIES} defaultValue="Indian" />
             <Field id="native_place" label="Native place" req />
             <SelectField id="physically_handicapped" label="Physically handicapped" req
                          options={['No', 'Yes']} defaultValue="No" />
@@ -202,17 +239,24 @@ export default function FullForm() {
           <div className="field-row">
             <div className="field">
               <label htmlFor="marital_status">Status <span className="req">*</span></label>
-              <select id="marital_status" name="marital_status" required defaultValue="">
+              <select id="marital_status" name="marital_status" required
+                      value={marital} onChange={(e) => setMarital(e.target.value)}>
                 <option value="" disabled>Select</option>
                 <option>Single</option><option>Married</option><option>Widower</option><option>Divorced</option>
               </select>
             </div>
-            <Field id="spouse_name" label="Husband / wife's name" placeholder="NA if single" />
-            <Field id="spouse_occupation" label="Occupation of spouse" placeholder="NA if single" />
+            {marital && marital !== 'Single' && (
+              <>
+                <Field id="spouse_name" label="Husband / wife's name" />
+                <Field id="spouse_occupation" label="Occupation of spouse" />
+              </>
+            )}
           </div>
-          <Rows label="Children" min={0}
-                cols={[{ key: 'name', label: 'Name of child' }, { key: 'dob', label: 'Date of birth', type: 'date' }]}
-                rows={children} setRows={setChildren} blank={{ name: '', dob: '' }} />
+          {marital && marital !== 'Single' && (
+            <Rows label="Children" min={0}
+                  cols={[{ key: 'name', label: 'Name of child' }, { key: 'dob', label: 'Date of birth', type: 'date' }]}
+                  rows={children} setRows={setChildren} blank={{ name: '', dob: '' }} />
+          )}
         </fieldset>
 
         <fieldset>
@@ -245,7 +289,7 @@ export default function FullForm() {
           <Rows label="Emergency contacts"
                 cols={[
                   { key: 'name', label: 'Name of the person' },
-                  { key: 'relationship', label: 'Relationship' },
+                  { key: 'relationship', label: 'Relationship', type: 'select', options: RELATIONSHIPS },
                   { key: 'contact', label: 'Contact number' },
                 ]}
                 rows={emergency} setRows={setEmergency} blank={{ name: '', relationship: '', contact: '' }} />
