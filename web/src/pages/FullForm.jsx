@@ -13,13 +13,24 @@ function Rows({ label, cols, rows, setRows, blank, min = 1 }) {
         <div key={i} className="field-row" style={{ marginBottom: 8, alignItems: 'end' }}>
           {cols.map((c) => (
             <div key={c.key}>
-              <input
-                placeholder={c.label}
-                aria-label={`${label} ${i + 1} — ${c.label}`}
-                type={c.type || 'text'}
-                value={row[c.key] || ''}
-                onChange={(e) => update(i, c.key, e.target.value)}
-              />
+              {c.type === 'select' ? (
+                <select
+                  aria-label={`${label} ${i + 1} — ${c.label}`}
+                  value={row[c.key] || ''}
+                  onChange={(e) => update(i, c.key, e.target.value)}
+                >
+                  <option value="">{c.label}</option>
+                  {c.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <input
+                  placeholder={c.label}
+                  aria-label={`${label} ${i + 1} — ${c.label}`}
+                  type={c.type || 'text'}
+                  value={row[c.key] || ''}
+                  onChange={(e) => update(i, c.key, e.target.value)}
+                />
+              )}
             </div>
           ))}
           <div style={{ maxWidth: 90 }}>
@@ -45,6 +56,17 @@ const Field = ({ id, label, req, ...rest }) => (
   </div>
 );
 
+// A dropdown that posts with the rest of the form (its `name` lands in FormData like any input).
+const SelectField = ({ id, label, req, options, defaultValue = '' }) => (
+  <div className="field">
+    <label htmlFor={id}>{label} {req && <span className="req">*</span>}</label>
+    <select id={id} name={id} required={req} defaultValue={defaultValue}>
+      <option value="" disabled>Select</option>
+      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  </div>
+);
+
 export default function FullForm() {
   const { token } = useParams();
   const [app, setApp] = useState(null);
@@ -53,7 +75,7 @@ export default function FullForm() {
   const [done, setDone] = useState(false);
 
   const [children, setChildren] = useState([{ name: '', dob: '' }]);
-  const [siblings, setSiblings] = useState([{ name: '', age: '', gender: '', marital: '', occupation: '' }]);
+  const [siblings, setSiblings] = useState([{ relation: '', age: '', gender: '', occupation: '', marital: '' }]);
   const [emergency, setEmergency] = useState([{ name: '', relationship: '', contact: '' }]);
   const [education, setEducation] = useState([
     { exam: 'SSLC', class_marks: '', institution: '', from: '', to: '', year: '', specialisation: '' },
@@ -77,7 +99,7 @@ export default function FullForm() {
     const details = {
       ...fd,
       children: children.filter((c) => c.name),
-      siblings: siblings.filter((s) => s.name),
+      siblings: siblings.filter((s) => s.relation),
       emergency_contacts: emergency.filter((c) => c.name),
       education: education.filter((c) => c.exam),
       employment: employment.filter((c) => c.employer),
@@ -141,12 +163,23 @@ export default function FullForm() {
           <div className="field-row">
             <Field id="date_of_birth" label="Date of birth" type="date" req />
             <Field id="age" label="Age" type="number" min="15" max="80" req />
-            <Field id="blood_group" label="Blood group" placeholder="O+" req />
+            <SelectField id="gender" label="Gender" req options={['Female', 'Male']} />
+            <SelectField id="blood_group" label="Blood group" req
+                         options={['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']} />
+          </div>
+          <div className="field-row">
+            <SelectField id="nationality" label="Nationality" req options={['Indian', 'Other']} defaultValue="Indian" />
             <Field id="native_place" label="Native place" req />
+            <SelectField id="physically_handicapped" label="Physically handicapped" req
+                         options={['No', 'Yes']} defaultValue="No" />
           </div>
           <div className="field-row">
             <Field id="pan" label="PAN number" placeholder="ABCDE1234F" req />
             <Field id="aadhaar" label="Aadhaar number" inputMode="numeric" req />
+          </div>
+          <div className="field-row">
+            <Field id="pf_number" label="PF number" placeholder="NA if none" />
+            <Field id="uan_number" label="UAN number" placeholder="NA if none" />
           </div>
           <div className="field-row">
             <Field id="phone" label="Contact number" req defaultValue={app.phone} />
@@ -194,16 +227,17 @@ export default function FullForm() {
             <Field id="mother_age" label="Age" type="number" min="0" />
             <Field id="mother_occupation" label="Occupation / place" />
           </div>
-          <Rows label="Brothers and sisters" min={0}
+          <Rows label="Siblings" min={0}
                 cols={[
-                  { key: 'name', label: 'Name' },
+                  { key: 'relation', label: 'Sibling', type: 'select',
+                    options: ['Elder Sister', 'Younger Sister', 'Elder Brother', 'Younger Brother'] },
                   { key: 'age', label: 'Age', type: 'number' },
-                  { key: 'gender', label: 'M / F' },
-                  { key: 'marital', label: 'Single / Married' },
+                  { key: 'gender', label: 'Gender', type: 'select', options: ['Female', 'Male'] },
                   { key: 'occupation', label: 'Occupation / place' },
+                  { key: 'marital', label: 'Marital status', type: 'select', options: ['Single', 'Married'] },
                 ]}
                 rows={siblings} setRows={setSiblings}
-                blank={{ name: '', age: '', gender: '', marital: '', occupation: '' }} />
+                blank={{ relation: '', age: '', gender: '', occupation: '', marital: '' }} />
         </fieldset>
 
         <fieldset>

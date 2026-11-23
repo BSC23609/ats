@@ -154,10 +154,15 @@ function FormDetails({ d }) {
       <div className="grid cols-2">
         <dl className="kv">
           <dt>Date of birth</dt><dd>{d.date_of_birth || '—'} ({d.age || '—'} yrs)</dd>
+          <dt>Gender</dt><dd>{d.gender || '—'}</dd>
           <dt>Blood group</dt><dd>{d.blood_group || '—'}</dd>
+          <dt>Nationality</dt><dd>{d.nationality || '—'}</dd>
           <dt>Native place</dt><dd>{d.native_place || '—'}</dd>
+          <dt>Physically handicapped</dt><dd>{d.physically_handicapped || '—'}</dd>
           <dt>PAN</dt><dd>{d.pan || '—'}</dd>
           <dt>Aadhaar</dt><dd>{d.aadhaar || '—'}</dd>
+          <dt>PF number</dt><dd>{d.pf_number || '—'}</dd>
+          <dt>UAN number</dt><dd>{d.uan_number || '—'}</dd>
           <dt>Marital status</dt><dd>{d.marital_status || '—'}</dd>
           <dt>Spouse</dt><dd>{[d.spouse_name, d.spouse_occupation].filter(Boolean).join(' · ') || '—'}</dd>
         </dl>
@@ -185,9 +190,9 @@ function FormDetails({ d }) {
       <Table title="Previous company HR contacts" rows={d.previous_hr_contacts}
              cols={[{ key: 'name', label: 'Name' }, { key: 'designation', label: 'Designation' }, { key: 'contact', label: 'Contact' }]} />
       <Table title="Children" rows={d.children} cols={[{ key: 'name', label: 'Name' }, { key: 'dob', label: 'Date of birth' }]} />
-      <Table title="Brothers and sisters" rows={d.siblings}
-             cols={[{ key: 'name', label: 'Name' }, { key: 'age', label: 'Age' }, { key: 'gender', label: 'M/F' },
-                    { key: 'marital', label: 'Marital' }, { key: 'occupation', label: 'Occupation / place' }]} />
+      <Table title="Siblings" rows={d.siblings}
+             cols={[{ key: 'relation', label: 'Sibling' }, { key: 'age', label: 'Age' }, { key: 'gender', label: 'Gender' },
+                    { key: 'occupation', label: 'Occupation / place' }, { key: 'marital', label: 'Marital status' }]} />
 
       <p className="sub" style={{ marginTop: 16 }}>
         Declared by {d.declaration_signature} at {d.declaration_place} on {d.declaration_date}.
