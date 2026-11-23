@@ -12,7 +12,7 @@ import { safeName } from './graph.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let LOGO = null;
-try { LOGO = fs.readFileSync(path.join(__dirname, '../assets/group-logo.png')); }
+try { LOGO = fs.readFileSync(path.join(__dirname, '../assets/bsc-logo.png')); }
 catch { /* logo optional — the PDF still renders without it */ }
 
 const NAVY = '#0A2B66';
@@ -130,16 +130,18 @@ export function renderApplicationFormPdf(app, d = {}) {
       doc.moveDown(0.4);
     };
 
-    // ---- Header band: group logo + title ----
+    // ---- Header band: company logo (centred) + title ----
+    const logoW = 86;
     if (LOGO) {
-      try { doc.image(LOGO, M.left, M.top, { width: 150 }); } catch { /* ignore */ }
+      try { doc.image(LOGO, (W - logoW) / 2, M.top, { width: logoW }); } catch { /* ignore */ }
+      doc.y = M.top + logoW + 4;
     } else {
-      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(15).text('THE BHARAT STEEL GROUP', M.left, M.top + 10);
+      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(14).text('BHARAT STEEL (CHENNAI) PVT. LTD.', M.left, M.top + 12, { width: contentW, align: 'center' });
+      doc.y = M.top + 40;
     }
-    doc.fillColor(MUTED).font('Helvetica').fontSize(8).text('HUMAN RESOURCES', M.left, M.top + 6, { width: contentW, align: 'right' });
-    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(9).text('Employee Master Data', M.left, M.top + 18, { width: contentW, align: 'right' });
-
-    doc.y = M.top + 60;
+    doc.x = M.left;
+    doc.fillColor(MUTED).font('Helvetica').fontSize(8).text('HUMAN RESOURCES  ·  EMPLOYEE MASTER DATA', M.left, doc.y, { width: contentW, align: 'center' });
+    doc.moveDown(0.4);
     doc.moveTo(M.left, doc.y).lineTo(W - M.right, doc.y).lineWidth(1.4).strokeColor(NAVY).stroke();
     doc.moveDown(0.7);
 
