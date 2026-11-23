@@ -56,6 +56,15 @@ export async function getFile(key) {
   return fs.readFile(path.join(LOCAL_DIR, key));
 }
 
+/** Move/rename a stored file from one key to another (download → re-upload → delete the original). */
+export async function moveFile(oldKey, newKey, contentType = 'application/octet-stream') {
+  if (!oldKey || oldKey === newKey) return newKey;
+  const buffer = await getFile(oldKey);
+  await putFile(newKey, buffer, contentType);
+  await deleteFile(oldKey);
+  return newKey;
+}
+
 export async function deleteFile(key) {
   try {
     if (DRIVER === 'onedrive') return graph.remove(key);

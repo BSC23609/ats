@@ -5,7 +5,7 @@ import path from 'path';
 import { one, q, tx } from '../db.js';
 import { requireAuth, requireSuperAdmin, companyFilter, assertCompanyAccess } from '../auth.js';
 import { extractText, summariseResume } from '../services/resume.js';
-import { putFile, deleteFile } from '../services/storage.js';
+import { putFile, deleteFile, getFile, moveFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { syncWorkbook } from '../services/workbook.js';
 import { describeRange } from '../services/html.js';
@@ -181,6 +181,74 @@ jobs.patch('/:id', async (req, res) => {
  * they applied for as plain text. Losing a job posting is an administrative tidy-up; losing a
  * person's application is data loss.
  */
+/**
+ * One-time OneDrive tidy-up: re-file every resume at the canonical path
+ * {COMPANY}/{Role}/{Name}_{AppID}.ext and remove the stray "Resume" folder, so duplicate
+ * company folders are merged. GET previews (dry-run); add ?apply=1 to actually move the files.
+ */
+const RESUME_CT = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.txt': 'text/plain',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+};
+jobs.get('/onedrive/reorganize', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const apply = req.query.apply === '1' || req.query.apply === 'true';
+    const { rows } = await q(
+      `SELECT a.id, a.full_name, a.position_applied, a.resume_path, a.resume_filename, c.code AS company_code
+         FROM applications a JOIN companies c ON c.id = a.company_id
+        WHERE a.resume_path IS NOT NULL
+        ORDER BY a.id`
+    );
+
+    const items = [];
+    const errors = [];
+    let alreadyCorrect = 0;
+
+    for (const r of rows) {
+      const src = r.resume_path;
+      const m = src.match(/\.[a-z0-9]+$/i) || (r.resume_filename || '').match(/\.[a-z0-9]+$/i);
+      const ext = (m ? m[0] : '.pdf').toLowerCase();
+      const canonical = `${r.company_code}/${safeName(r.position_applied)}/${safeName(r.full_name)}_${r.id}${ext}`;
+      if (src === canonical) { alreadyCorrect += 1; continue; }
+      if (!apply) { items.push({ from: src, to: canonical }); continue; }
+      try {
+        await moveFile(src, canonical, RESUME_CT[ext] || 'application/octet-stream');
+        await q('UPDATE applications SET resume_path = $1 WHERE id = $2', [canonical, r.id]);
+        items.push({ from: src, to: canonical });
+      } catch (e) {
+        errors.push({ id: r.id, from: src, error: (e.message || 'move failed').slice(0, 200) });
+      }
+    }
+
+    // Once every resume is re-filed, delete the leftover top-level "Resume" folder (only if clean).
+    let removedResumeFolder = false;
+    if (apply && errors.length === 0) {
+      try { await deleteFile('Resume'); removedResumeFolder = true; } catch { /* already gone */ }
+    }
+
+    res.json({
+      dry_run: !apply,
+      total_resumes: rows.length,
+      already_correct: alreadyCorrect,
+      moved: apply ? items.length : 0,
+      to_move: apply ? undefined : items.length,
+      items: items.slice(0, 300),
+      errors,
+      removed_resume_folder: removedResumeFolder,
+      note: apply
+        ? 'Resumes re-filed under {COMPANY}/{ROLE}; duplicate folders merged.'
+        : 'Preview only. Re-open this URL with ?apply=1 to move the files.',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 jobs.delete('/:id', requireSuperAdmin, async (req, res) => {
   const job = await one('SELECT * FROM jobs WHERE id=$1', [req.params.id]);
   if (!job) return res.status(404).json({ error: 'Opening not found.' });

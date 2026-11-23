@@ -7,7 +7,7 @@ export default function Settings() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [wati, setWati] = useState(null);     // {loading} | result JSON
-
+  const [reorg, setReorg] = useState(null);   // OneDrive resume tidy-up result
 
   const testWati = async () => {
     setWati({ loading: true });
@@ -17,6 +17,18 @@ export default function Settings() {
     } catch (err) {
       setWati({ error: err.message });
     }
+  };
+
+  const previewReorg = async () => {
+    setReorg({ loading: true });
+    try { setReorg(await api.get('/jobs/onedrive/reorganize')); }
+    catch (err) { setReorg({ error: err.message }); }
+  };
+  const applyReorg = async () => {
+    if (!window.confirm('Re-file every resume under its Company/Role folder and merge the duplicate folders in OneDrive? This moves files.')) return;
+    setReorg({ loading: true });
+    try { setReorg(await api.get('/jobs/onedrive/reorganize?apply=1')); }
+    catch (err) { setReorg({ error: err.message }); }
   };
 
   const savePassword = async (e) => {
@@ -125,6 +137,45 @@ export default function Settings() {
                   borderRadius: 3, padding: 12, fontSize: 12, overflowX: 'auto',
                   fontFamily: 'var(--f-mono)'
                 }}>{JSON.stringify(wati, null, 2)}</pre>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {user.role === 'SUPER_ADMIN' && (
+        <div className="panel" style={{ marginTop: 16 }}>
+          <div className="panel-head"><h2>Resume folders (OneDrive)</h2></div>
+          <div className="panel-body">
+            <p className="sub" style={{ marginTop: 0 }}>
+              Re-files every resume under <strong>Company / Role / Name</strong> and merges the old
+              duplicate folders (including the stray “Resume” folder). Preview first, then apply.
+            </p>
+            <div className="row" style={{ gap: 8 }}>
+              <button className="ghost" onClick={previewReorg} disabled={reorg?.loading}>
+                {reorg?.loading ? 'Working…' : 'Preview'}
+              </button>
+              <button className="primary" onClick={applyReorg} disabled={reorg?.loading}>
+                Tidy up now
+              </button>
+            </div>
+
+            {reorg && !reorg.loading && (
+              <div style={{ marginTop: 14 }}>
+                {reorg.error ? (
+                  <div className="error">{reorg.error}</div>
+                ) : (
+                  <div className="success">
+                    {reorg.dry_run
+                      ? `Preview: ${reorg.to_move} resume(s) will be moved, ${reorg.already_correct} already correct.`
+                      : `Done: moved ${reorg.moved} resume(s), ${reorg.already_correct} already correct${reorg.removed_resume_folder ? ', removed the old “Resume” folder' : ''}.${reorg.errors?.length ? ` ${reorg.errors.length} error(s).` : ''}`}
+                  </div>
+                )}
+                <pre style={{
+                  marginTop: 12, background: '#f5f6f5', border: '1px solid var(--line)',
+                  borderRadius: 3, padding: 12, fontSize: 12, overflowX: 'auto',
+                  maxHeight: 320, overflowY: 'auto', fontFamily: 'var(--f-mono)',
+                }}>{JSON.stringify(reorg, null, 2)}</pre>
               </div>
             )}
           </div>

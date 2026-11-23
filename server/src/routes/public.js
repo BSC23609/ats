@@ -119,8 +119,8 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
       const ext = path.extname(req.file.originalname) || '.pdf';
       // Filed as:  {COMPANY}/{Role}/{Name}_{AppID}/resume.ext  — one folder per candidate, so the
       // resume, offer letter (and, later, the form PDFs) for one person sit together.
-      const folder = `${company.code}/${safeName(b.position_applied)}/${safeName(b.full_name)}_${seq.n}`;
-      resumeKey = `${folder}/resume${ext}`;
+      // Filed directly in the role folder: {COMPANY}/{Role}/{Name}_{AppID}.ext — one resume per candidate.
+      resumeKey = `${company.code}/${safeName(b.position_applied)}/${safeName(b.full_name)}_${seq.n}${ext}`;
       await putFile(resumeKey, req.file.buffer, req.file.mimetype);
     }
 

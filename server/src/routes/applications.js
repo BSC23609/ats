@@ -54,8 +54,8 @@ r.post('/', resumeUpload.single('resume'), async (req, res) => {
     if (req.file) {
       const m = (req.file.originalname || '').match(/\.[a-z0-9]+$/i);
       const ext = m ? m[0] : '.pdf';
-      const folder = `${company.code}/${safeName(b.position_applied)}/${safeName(b.full_name)}_${seq.n}`;
-      resumeKey = `${folder}/resume${ext}`;
+      // Filed directly in the role folder: {COMPANY}/{Role}/{Name}_{AppID}.ext
+      resumeKey = `${company.code}/${safeName(b.position_applied)}/${safeName(b.full_name)}_${seq.n}${ext}`;
       await putFile(resumeKey, req.file.buffer, req.file.mimetype);
     }
 
