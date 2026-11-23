@@ -514,3 +514,8 @@ button.small { padding: 5px 10px; font-size: 12px; font-weight: 500; }
   cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
 }
 .linklike:hover { color: var(--blue-dark); }
+
+/* Joining checklist — compact grid so the inputs sit neatly inside each cell */
+.jc-table td, .jc-table th { padding: 8px 10px; }
+.jc-table input, .jc-table select { padding: 6px 8px; font-size: 13px; }
+.jc-table td input, .jc-table td select { margin: 0; }

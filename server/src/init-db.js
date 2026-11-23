@@ -66,6 +66,17 @@ export async function migrate() {
        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
      )`,
     `CREATE INDEX IF NOT EXISTS idx_password_otps_user ON password_otps(user_id)`,
+    // Employee joining checklist (HR onboarding form) — one per application, saved as a draft
+    // until HR finally submits it. The whole filled form lives in `data` (see web JoiningChecklist).
+    `CREATE TABLE IF NOT EXISTS joining_checklists (
+       application_id INT PRIMARY KEY REFERENCES applications(id) ON DELETE CASCADE,
+       data          JSONB NOT NULL DEFAULT '{}'::jsonb,
+       status        TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','SUBMITTED')),
+       submitted_at  TIMESTAMPTZ,
+       updated_by    INT REFERENCES users(id),
+       created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+     )`,
   ];
   for (const sql of steps) {
     try {

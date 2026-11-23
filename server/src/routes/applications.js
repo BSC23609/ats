@@ -561,4 +561,100 @@ r.post('/:id/reopen-form', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------------------------------------------------------------------------
+// Employee joining checklist (HR onboarding form, one per candidate)
+// ---------------------------------------------------------------------------
+
+/** The joining checklist for a candidate, plus details pulled from the application to pre-fill a
+ *  blank form. Returns an empty checklist (status NONE) when HR hasn't started one yet. */
+r.get('/:id/joining-checklist', async (req, res) => {
+  const app = await one(
+    `SELECT a.id, a.company_id, a.ref_code, a.full_name, a.position_applied, a.phone, a.email,
+            a.current_location, a.offer_designation, a.offer_joining_date,
+            c.name AS company_name, c.code AS company_code
+       FROM applications a JOIN companies c ON c.id = a.company_id
+      WHERE a.id = $1`,
+    [req.params.id]
+  );
+  if (!app) return res.status(404).json({ error: 'Application not found.' });
+  if (!assertCompanyAccess(req, res, app.company_id)) return;
+
+  const row = await one(
+    `SELECT jc.data, jc.status, jc.submitted_at, u.name AS updated_by_name, jc.updated_at
+       FROM joining_checklists jc LEFT JOIN users u ON u.id = jc.updated_by
+      WHERE jc.application_id = $1`,
+    [req.params.id]
+  );
+
+  res.json({
+    status: row?.status || 'NONE',
+    submitted_at: row?.submitted_at || null,
+    updated_by_name: row?.updated_by_name || null,
+    updated_at: row?.updated_at || null,
+    data: row?.data || null,
+    // Seed values for a brand-new form, taken from what the application already knows.
+    prefill: {
+      employee_name: app.full_name || '',
+      designation: app.offer_designation || app.position_applied || '',
+      department: '',
+      date_of_joining: app.offer_joining_date ? String(app.offer_joining_date).slice(0, 10) : '',
+      work_location: app.current_location || '',
+      reporting_manager: '',
+      contact_no: app.phone || '',
+      employee_id: '',
+    },
+    candidate: {
+      id: app.id,
+      ref_code: app.ref_code,
+      full_name: app.full_name,
+      company_name: app.company_name,
+      company_code: app.company_code,
+    },
+  });
+});
+
+/** Save the checklist as a draft (create or overwrite). Nothing here is mandatory. */
+r.put('/:id/joining-checklist', async (req, res) => {
+  const app = await one('SELECT company_id FROM applications WHERE id=$1', [req.params.id]);
+  if (!app) return res.status(404).json({ error: 'Application not found.' });
+  if (!assertCompanyAccess(req, res, app.company_id)) return;
+
+  const data = req.body?.data;
+  if (!data || typeof data !== 'object')
+    return res.status(400).json({ error: 'Nothing to save.' });
+
+  await q(
+    `INSERT INTO joining_checklists (application_id, data, status, submitted_at, updated_by, updated_at)
+          VALUES ($1, $2::jsonb, 'DRAFT', NULL, $3, now())
+     ON CONFLICT (application_id)
+     DO UPDATE SET data = $2::jsonb, status = 'DRAFT', submitted_at = NULL,
+                   updated_by = $3, updated_at = now()`,
+    [req.params.id, JSON.stringify(data), req.user.id]
+  );
+  res.json({ ok: true, status: 'DRAFT' });
+});
+
+/** Final submit — locks the record as SUBMITTED. Employee name is the one hard requirement. */
+r.post('/:id/joining-checklist/submit', async (req, res) => {
+  const app = await one('SELECT company_id FROM applications WHERE id=$1', [req.params.id]);
+  if (!app) return res.status(404).json({ error: 'Application not found.' });
+  if (!assertCompanyAccess(req, res, app.company_id)) return;
+
+  const data = req.body?.data;
+  if (!data || typeof data !== 'object')
+    return res.status(400).json({ error: 'Nothing to submit.' });
+  if (!String(data.employee_name || '').trim())
+    return res.status(400).json({ error: 'Employee name is required before submitting.' });
+
+  await q(
+    `INSERT INTO joining_checklists (application_id, data, status, submitted_at, updated_by, updated_at)
+          VALUES ($1, $2::jsonb, 'SUBMITTED', now(), $3, now())
+     ON CONFLICT (application_id)
+     DO UPDATE SET data = $2::jsonb, status = 'SUBMITTED', submitted_at = now(),
+                   updated_by = $3, updated_at = now()`,
+    [req.params.id, JSON.stringify(data), req.user.id]
+  );
+  res.json({ ok: true, status: 'SUBMITTED' });
+});
+
 export default r;

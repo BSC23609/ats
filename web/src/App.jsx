@@ -8,6 +8,7 @@ import JDView from './pages/JDView.jsx';
 import Interview from './pages/Interview.jsx';
 import Pipeline from './pages/Pipeline.jsx';
 import ApplicationDetail from './pages/ApplicationDetail.jsx';
+import JoiningChecklist from './pages/JoiningChecklist.jsx';
 import Employees from './pages/Employees.jsx';
 import Jobs from './pages/Jobs.jsx';
 import Users from './pages/Users.jsx';
@@ -75,6 +76,7 @@ export default function App() {
 
           <Route path="/pipeline" element={<Private><Pipeline /></Private>} />
           <Route path="/applications/:id" element={<Private><ApplicationDetail /></Private>} />
+          <Route path="/applications/:id/joining" element={<Private><JoiningChecklist /></Private>} />
           <Route path="/employees" element={<Private><Employees /></Private>} />
           <Route path="/jobs" element={<Private><Jobs /></Private>} />
           <Route path="/users" element={<Private superOnly><Users /></Private>} />

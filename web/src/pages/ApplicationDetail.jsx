@@ -278,7 +278,12 @@ export default function ApplicationDetail() {
           <h1>{app.full_name}</h1>
           <div className="sub">{app.position_applied}{app.job_title ? ` · ${app.job_title}` : ''}</div>
         </div>
-        <button className="ghost" onClick={() => navigate('/pipeline')}>← Back to pipeline</button>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <button className="signal" onClick={() => navigate(`/applications/${app.id}/joining`)}>
+            📋 Joining checklist
+          </button>
+          <button className="ghost" onClick={() => navigate('/pipeline')}>← Back to pipeline</button>
+        </div>
       </div>
 
       {/* the candidate's own position on the track */}
