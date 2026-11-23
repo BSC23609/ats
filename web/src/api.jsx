@@ -12,7 +12,8 @@ export const setToken = (t) => {
 
 async function request(path, { method = 'GET', body, form } = {}) {
   const headers = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const sent = token; // the token this request carries
+  if (sent) headers.Authorization = `Bearer ${sent}`;
   if (body) headers['Content-Type'] = 'application/json';
 
   const res = await fetch(`${BASE}${path}`, {
@@ -21,9 +22,13 @@ async function request(path, { method = 'GET', body, form } = {}) {
     body: form ? form : body ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401 && token) {
-    setToken(null);
-    window.location.href = '/login';
+  // Only an expired token sends people to /login. If a newer sign-in (e.g. the group hub's one-click
+  // sign-in) replaced the token while this request was on its way, its 401 must not throw that away.
+  if (res.status === 401 && sent) {
+    if (token === sent) {
+      setToken(null);
+      window.location.href = '/login';
+    }
     return;
   }
   const data = await res.json().catch(() => ({}));
@@ -89,9 +94,11 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!token) return setLoading(false);
+    const started = token;
+    // Ignore this answer if a newer sign-in (the group hub's one-click sign-in) changed the token meanwhile.
     api.get('/auth/me')
-      .then(setUser)
-      .catch(() => setToken(null))
+      .then((u) => { if (token === started && u) setUser(u); })
+      .catch(() => { if (token === started) setToken(null); })
       .finally(() => setLoading(false));
   }, []);
 
