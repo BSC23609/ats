@@ -343,9 +343,9 @@ export default function FullForm() {
             <label>HSC</label>
             <div className="field-row">
               <select value={edu.hsc.type} onChange={(e) => eduSet('hsc', 'type', e.target.value)}>
-                <option value="">Select — ITI / 12th / Polytechnic</option>
-                <option>ITI</option>
+                <option value="" disabled>Select</option>
                 <option>12th</option>
+                <option>ITI</option>
                 <option>Polytechnic</option>
               </select>
               <input placeholder="Grade / Percentage / CGPA" value={edu.hsc.grade}
