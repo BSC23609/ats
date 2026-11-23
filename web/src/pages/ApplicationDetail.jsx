@@ -186,8 +186,8 @@ function FormDetails({ d }) {
                  ? [
                      { level: 'SSLC', grade: d.education.sslc?.grade, institution: d.education.sslc?.school, from: d.education.sslc?.from, to: d.education.sslc?.to },
                      { level: d.education.hsc?.type ? `HSC · ${d.education.hsc.type}` : 'HSC', grade: d.education.hsc?.grade, institution: d.education.hsc?.school, from: d.education.hsc?.from, to: d.education.hsc?.to },
-                     { level: 'Undergraduate', grade: d.education.ug?.grade, institution: d.education.ug?.college, from: d.education.ug?.from, to: d.education.ug?.to },
-                     { level: 'Post Graduate', grade: d.education.pg?.grade, institution: d.education.pg?.college, from: d.education.pg?.from, to: d.education.pg?.to },
+                     { level: d.education.ug?.degree ? `Undergraduate · ${d.education.ug.degree}` : 'Undergraduate', grade: d.education.ug?.grade, institution: d.education.ug?.college, from: d.education.ug?.from, to: d.education.ug?.to },
+                     { level: d.education.pg?.degree ? `Post Graduate · ${d.education.pg.degree}` : 'Post Graduate', grade: d.education.pg?.grade, institution: d.education.pg?.college, from: d.education.pg?.from, to: d.education.pg?.to },
                    ].filter((r) => r.grade || r.institution || r.from || r.to)
                  : []}
              cols={[{ key: 'level', label: 'Level' }, { key: 'grade', label: 'Grade / %' },

@@ -43,6 +43,15 @@ const NATIONALITIES = [
 const THIS_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: THIS_YEAR - 1970 + 1 }, (_, i) => String(THIS_YEAR - i));
 
+// Degree options for undergraduate / post-graduate.
+const UG_DEGREES = [
+  'B.E', 'B.Tech', 'B.Sc', 'B.Com', 'B.A', 'BBA', 'BCA', 'B.Arch', 'B.Pharm', 'LLB', 'B.Ed',
+  'Diploma', 'Other',
+];
+const PG_DEGREES = [
+  'M.E', 'M.Tech', 'M.Sc', 'M.Com', 'M.A', 'MBA', 'MCA', 'M.Pharm', 'LLM', 'M.Ed', 'Ph.D', 'Other',
+];
+
 /* Repeatable table blocks — children, siblings, emergency contacts, education, employment */
 function Rows({ label, cols, rows, setRows, blank, min = 1 }) {
   const update = (i, key, value) => setRows(rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
@@ -127,8 +136,8 @@ export default function FullForm() {
   const [edu, setEdu] = useState({
     sslc: { grade: '', school: '', from: '', to: '' },
     hsc:  { type: '', grade: '', school: '', from: '', to: '' },
-    ug:   { grade: '', college: '', from: '', to: '' },
-    pg:   { grade: '', college: '', from: '', to: '' },
+    ug:   { degree: '', grade: '', college: '', from: '', to: '' },
+    pg:   { degree: '', grade: '', college: '', from: '', to: '' },
   });
   const eduSet = (level, key, val) => setEdu((e) => ({ ...e, [level]: { ...e[level], [key]: val } }));
   const yearSelect = (level, key, ph) => (
@@ -360,6 +369,10 @@ export default function FullForm() {
           <div style={{ marginBottom: 14 }}>
             <label>Undergraduate</label>
             <div className="field-row">
+              <select value={edu.ug.degree} onChange={(e) => eduSet('ug', 'degree', e.target.value)}>
+                <option value="" disabled>Degree</option>
+                {UG_DEGREES.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
               <input placeholder="Grade / Percentage / CGPA" value={edu.ug.grade}
                      onChange={(e) => eduSet('ug', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.ug.college}
@@ -372,6 +385,10 @@ export default function FullForm() {
           <div style={{ marginBottom: 14 }}>
             <label>Post Graduate</label>
             <div className="field-row">
+              <select value={edu.pg.degree} onChange={(e) => eduSet('pg', 'degree', e.target.value)}>
+                <option value="" disabled>Degree</option>
+                {PG_DEGREES.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
               <input placeholder="Grade / Percentage / CGPA" value={edu.pg.grade}
                      onChange={(e) => eduSet('pg', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.pg.college}
