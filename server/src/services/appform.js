@@ -14,6 +14,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let LOGO = null;
 try { LOGO = fs.readFileSync(path.join(__dirname, '../assets/bsc-logo.png')); }
 catch { /* logo optional — the PDF still renders without it */ }
+let GROUP_NAME = null;
+try { GROUP_NAME = fs.readFileSync(path.join(__dirname, '../assets/group-name.png')); }
+catch { /* optional — falls back to text */ }
 
 const NAVY = '#0A2B66';
 const INK = '#1f2430';
@@ -137,8 +140,14 @@ export function renderApplicationFormPdf(app, d = {}) {
     if (LOGO) {
       try { doc.image(LOGO, M.left, M.top, { width: logoW }); } catch { /* ignore */ }
     }
-    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(15)
-      .text('THE BHARAT STEEL GROUP', M.left, M.top + 22, { width: contentW, align: 'right' });
+    if (GROUP_NAME) {
+      const gw = 150;
+      const gh = (gw * 133) / 375; // keep the wordmark's aspect ratio
+      try { doc.image(GROUP_NAME, W - M.right - gw, M.top + (logoW - gh) / 2, { width: gw }); } catch { /* ignore */ }
+    } else {
+      doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(15)
+        .text('THE BHARAT STEEL GROUP', M.left, M.top + 22, { width: contentW, align: 'right' });
+    }
     doc.y = M.top + logoW + 8;
     doc.x = M.left;
     doc.moveTo(M.left, doc.y).lineTo(W - M.right, doc.y).lineWidth(1.4).strokeColor(NAVY).stroke();
