@@ -245,31 +245,21 @@ async function interviewApp(token) {
   );
 }
 
-/** Finalise the interview: score the transcript, store the result, and return the closing line. */
+/** Finalise the interview. Mark it DONE and close out immediately, then score the transcript in
+ *  the BACKGROUND — the candidate sees the completion screen at once instead of waiting ~30s. */
 async function finishInterview(app, transcript, res) {
-  let result = { questions: (app.interview_result && app.interview_result.questions) || [] };
-  try {
-    const scored = await scoreInterview({
-      position: app.position_applied,
-      company: app.company_name,
-      jobDescription: app.job_description,
-      transcript,
-    });
-    result = { ...result, ...scored };
-  } catch (err) {
-    result = { ...result, score: null, error: err.message.slice(0, 300) };
-  }
+  const baseResult = { questions: (app.interview_result && app.interview_result.questions) || [] };
 
+  // Record the finished interview straight away (status DONE, transcript saved, score pending).
   await q(
     `UPDATE applications
         SET interview_status='DONE',
             interview_completed_at = now(),
-            interview_score = $2,
-            interview_result = $3,
-            interview_transcript = $4,
+            interview_result = $2,
+            interview_transcript = $3,
             updated_at = now()
       WHERE id=$1`,
-    [app.id, result.score ?? null, JSON.stringify(result), JSON.stringify(transcript)]
+    [app.id, JSON.stringify(baseResult), JSON.stringify(transcript)]
   );
 
   const closing =
@@ -277,6 +267,21 @@ async function finishInterview(app, transcript, res) {
     'Our team will review your responses and be in touch about the next steps. All the best.';
   const voice = await tts(closing);
   res.json({ transcript: transcript.at(-1)?.text || '', done: true, text: closing, audio: voice.audio || null });
+
+  // Score in the background — fills in the score/report after the candidate has already finished.
+  scoreInterview({
+    position: app.position_applied,
+    company: app.company_name,
+    jobDescription: app.job_description,
+    transcript,
+  })
+    .then((scored) =>
+      q(`UPDATE applications SET interview_score=$2, interview_result=$3, updated_at=now() WHERE id=$1`,
+        [app.id, scored.score ?? null, JSON.stringify({ ...baseResult, ...scored })]))
+    .catch((err) =>
+      q(`UPDATE applications SET interview_result=$2 WHERE id=$1`,
+        [app.id, JSON.stringify({ ...baseResult, score: null, error: String(err.message).slice(0, 300) })])
+        .catch(() => {}));
 }
 
 /** Candidate opens the interview link — basic info + whether it's already done. */
@@ -324,6 +329,24 @@ r.post('/interview/:token/start', async (req, res) => {
   );
 
   res.json({ text: greeting, audio: voice.audio, done: false });
+
+  // Pre-generate the questions NOW (from resume + JD) while the candidate gives their ~90s intro,
+  // so there is no wait after the introduction. If this hasn't finished by then, /answer falls back
+  // to generating them on the spot.
+  generateQuestions({
+    position: app.position_applied,
+    company: app.company_name,
+    intro: '',
+    resumeText: app.resume_text,
+    jobDescription: app.job_description,
+    count: 5,
+  })
+    .then((questions) => {
+      if (questions && questions.length)
+        return q(`UPDATE applications SET interview_result=$2 WHERE id=$1`,
+          [app.id, JSON.stringify({ questions })]);
+    })
+    .catch((e) => console.error('interview pre-generate questions failed:', e.message));
 });
 
 /**
@@ -357,8 +380,9 @@ r.post('/interview/:token/answer', audioUpload.array('audio', 6), async (req, re
 
   // After the self-introduction, build the question set from intro + resume + JD.
   let result = app.interview_result && typeof app.interview_result === 'object' ? app.interview_result : {};
-  let questions = Array.isArray(result.questions) ? result.questions : null;
-  if (answered === 1 || !questions) {
+  let questions = Array.isArray(result.questions) && result.questions.length ? result.questions : null;
+  if (!questions) {
+    // Questions weren't pre-generated in time at /start — build them now from intro + resume + JD.
     try {
       questions = await generateQuestions({
         position: app.position_applied,
