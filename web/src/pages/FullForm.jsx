@@ -39,6 +39,10 @@ const NATIONALITIES = [
   'Venezuelan', 'Vietnamese', 'Yemeni', 'Zambian', 'Zimbabwean', 'Other',
 ];
 
+// Years for the education From/To dropdowns — this year down to 1970.
+const THIS_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: THIS_YEAR - 1970 + 1 }, (_, i) => String(THIS_YEAR - i));
+
 /* Repeatable table blocks — children, siblings, emergency contacts, education, employment */
 function Rows({ label, cols, rows, setRows, blank, min = 1 }) {
   const update = (i, key, value) => setRows(rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
@@ -111,12 +115,28 @@ export default function FullForm() {
   const [done, setDone] = useState(false);
   const [marital, setMarital] = useState('');     // controls whether spouse/children fields show
 
+  // Addresses are controlled so "same as permanent" can mirror one into the other.
+  const [permanentAddr, setPermanentAddr] = useState('');
+  const [presentAddr, setPresentAddr] = useState('');
+  const [sameAddr, setSameAddr] = useState(false);
+
   const [children, setChildren] = useState([{ name: '', dob: '' }]);
   const [siblings, setSiblings] = useState([{ relation: '', age: '', gender: '', occupation: '', marital: '' }]);
   const [emergency, setEmergency] = useState([{ name: '', relationship: '', contact: '' }]);
-  const [education, setEducation] = useState([
-    { exam: 'SSLC', class_marks: '', institution: '', from: '', to: '', year: '', specialisation: '' },
-  ]);
+  // Four fixed education levels, each with its own fields.
+  const [edu, setEdu] = useState({
+    sslc: { grade: '', school: '', from: '', to: '' },
+    hsc:  { type: '', grade: '', school: '', from: '', to: '' },
+    ug:   { grade: '', college: '', from: '', to: '' },
+    pg:   { grade: '', college: '', from: '', to: '' },
+  });
+  const eduSet = (level, key, val) => setEdu((e) => ({ ...e, [level]: { ...e[level], [key]: val } }));
+  const yearSelect = (level, key, ph) => (
+    <select value={edu[level][key]} onChange={(e) => eduSet(level, key, e.target.value)}>
+      <option value="">{ph}</option>
+      {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+    </select>
+  );
   const [employment, setEmployment] = useState([
     { employer: '', designation_joining: '', designation_leaving: '', from: '', to: '',
       salary_joining: '', salary_leaving: '', reason_for_leaving: '' },
@@ -138,7 +158,7 @@ export default function FullForm() {
       children: children.filter((c) => c.name),
       siblings: siblings.filter((s) => s.relation),
       emergency_contacts: emergency.filter((c) => c.name),
-      education: education.filter((c) => c.exam),
+      education: edu,
       employment: employment.filter((c) => c.employer),
       previous_hr_contacts: referees.filter((c) => c.name),
       submitted_at: new Date().toISOString(),
@@ -225,11 +245,20 @@ export default function FullForm() {
           <div className="field-row">
             <div className="field">
               <label htmlFor="permanent_address">Permanent address with PIN code and phone <span className="req">*</span></label>
-              <textarea id="permanent_address" name="permanent_address" required />
+              <textarea id="permanent_address" name="permanent_address" required
+                        value={permanentAddr}
+                        onChange={(e) => { setPermanentAddr(e.target.value); if (sameAddr) setPresentAddr(e.target.value); }} />
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, fontWeight: 400 }}>
+                <input type="checkbox" checked={sameAddr} style={{ width: 'auto' }}
+                       onChange={(e) => { setSameAddr(e.target.checked); if (e.target.checked) setPresentAddr(permanentAddr); }} />
+                Present address is the same as permanent
+              </label>
             </div>
             <div className="field">
               <label htmlFor="present_address">Present address with PIN code and phone <span className="req">*</span></label>
-              <textarea id="present_address" name="present_address" required />
+              <textarea id="present_address" name="present_address" required
+                        value={sameAddr ? permanentAddr : presentAddr} readOnly={sameAddr}
+                        onChange={(e) => setPresentAddr(e.target.value)} />
             </div>
           </div>
         </fieldset>
@@ -297,17 +326,60 @@ export default function FullForm() {
 
         <fieldset>
           <legend>Education — academic and technical, starting with SSLC</legend>
-          <Rows label="Qualifications"
-                cols={[
-                  { key: 'exam', label: 'Exam passed' },
-                  { key: 'class_marks', label: 'Class / marks' },
-                  { key: 'institution', label: 'School / college and place' },
-                  { key: 'from', label: 'From (year)' },
-                  { key: 'to', label: 'To (year)' },
-                  { key: 'specialisation', label: 'Electives / specialisation' },
-                ]}
-                rows={education} setRows={setEducation}
-                blank={{ exam: '', class_marks: '', institution: '', from: '', to: '', specialisation: '' }} />
+
+          <div style={{ marginBottom: 14 }}>
+            <label>SSLC</label>
+            <div className="field-row">
+              <input placeholder="Grade / Percentage / CGPA" value={edu.sslc.grade}
+                     onChange={(e) => eduSet('sslc', 'grade', e.target.value)} />
+              <input placeholder="School name" value={edu.sslc.school}
+                     onChange={(e) => eduSet('sslc', 'school', e.target.value)} />
+              {yearSelect('sslc', 'from', 'From year')}
+              {yearSelect('sslc', 'to', 'To year')}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label>HSC</label>
+            <div className="field-row">
+              <select value={edu.hsc.type} onChange={(e) => eduSet('hsc', 'type', e.target.value)}>
+                <option value="">Select — ITI / 12th / Polytechnic</option>
+                <option>ITI</option>
+                <option>12th</option>
+                <option>Polytechnic</option>
+              </select>
+              <input placeholder="Grade / Percentage / CGPA" value={edu.hsc.grade}
+                     onChange={(e) => eduSet('hsc', 'grade', e.target.value)} />
+              <input placeholder="School name" value={edu.hsc.school}
+                     onChange={(e) => eduSet('hsc', 'school', e.target.value)} />
+              {yearSelect('hsc', 'from', 'From year')}
+              {yearSelect('hsc', 'to', 'To year')}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label>Undergraduate</label>
+            <div className="field-row">
+              <input placeholder="Grade / Percentage / CGPA" value={edu.ug.grade}
+                     onChange={(e) => eduSet('ug', 'grade', e.target.value)} />
+              <input placeholder="College name" value={edu.ug.college}
+                     onChange={(e) => eduSet('ug', 'college', e.target.value)} />
+              {yearSelect('ug', 'from', 'From year')}
+              {yearSelect('ug', 'to', 'To year')}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label>Post Graduate</label>
+            <div className="field-row">
+              <input placeholder="Grade / Percentage / CGPA" value={edu.pg.grade}
+                     onChange={(e) => eduSet('pg', 'grade', e.target.value)} />
+              <input placeholder="College name" value={edu.pg.college}
+                     onChange={(e) => eduSet('pg', 'college', e.target.value)} />
+              {yearSelect('pg', 'from', 'From year')}
+              {yearSelect('pg', 'to', 'To year')}
+            </div>
+          </div>
         </fieldset>
 
         <fieldset>
@@ -317,8 +389,8 @@ export default function FullForm() {
                   { key: 'employer', label: 'Company name and full address with PIN' },
                   { key: 'designation_joining', label: 'Designation on joining' },
                   { key: 'designation_leaving', label: 'Designation while leaving' },
-                  { key: 'from', label: 'From', type: 'month' },
-                  { key: 'to', label: 'To', type: 'month' },
+                  { key: 'from', label: 'Joining date', type: 'date' },
+                  { key: 'to', label: 'Leaving date', type: 'date' },
                   { key: 'salary_joining', label: 'Salary on joining (₹ PA)', type: 'number' },
                   { key: 'salary_leaving', label: 'Salary while leaving (₹ PA)', type: 'number' },
                   { key: 'reason_for_leaving', label: 'Reason for leaving' },
