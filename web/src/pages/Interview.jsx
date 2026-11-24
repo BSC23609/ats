@@ -119,6 +119,14 @@ export default function Interview() {
     } catch { /* recording is best-effort; the interview still works without it */ }
   };
 
+  // Camera went off mid-interview — stop everything and tell the candidate. The camera is compulsory.
+  const abortNoCamera = () => {
+    clearInterval(overallRef.current);
+    stopAll();
+    setError('Your camera was turned off. This interview requires the camera to stay on throughout — please reload and start again with your camera on.');
+    setPhase('finished');
+  };
+
   const stopAll = () => {
     stopSegRef.current = true;
     clearTimeout(timerRef.current); clearInterval(countRef.current); clearInterval(overallRef.current);
@@ -250,6 +258,9 @@ export default function Interview() {
     }
     streamRef.current = stream;
     startVideoRecording(stream);   // record the whole session for the HR video archive
+    // If the camera is switched off, covered or unplugged mid-interview, end it — the camera is
+    // compulsory for the whole session, not only at the start.
+    try { vids[0].onended = () => abortNoCamera(); } catch { /* */ }
     setPhase('speaking');
     // Start the overall 5-minute clock; when it runs out we stop the current answer and let the
     // server wrap up and score on that final submission.
@@ -259,6 +270,9 @@ export default function Interview() {
     overallRef.current = setInterval(() => {
       const rem = endRef.current - Date.now();
       setLeft(rem);
+      // Keep enforcing the camera: a dead/disabled video track means it was turned off.
+      const vt = streamRef.current && streamRef.current.getVideoTracks()[0];
+      if (!vt || vt.readyState !== 'live' || !vt.enabled) { abortNoCamera(); return; }
       if (rem <= 0) {
         clearInterval(overallRef.current);
         if (recRef.current && recRef.current.state !== 'inactive') stopRecording();
