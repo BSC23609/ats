@@ -194,10 +194,11 @@ export async function summariseResume(
     `Candidate's stated location: ${candidateLocation || 'not stated'}\n\n` +
     `JOB DESCRIPTION\n---------------\n` +
     (jobDescription?.trim()
-      ? jobDescription.slice(0, 20000)
+      ? jobDescription.slice(0, 8000)
       : `None was uploaded for this role. Score against the job title alone and say so in ` +
         `score_reasoning — a score without a job description is a weak signal.`) +
-    `\n\nRESUME\n------\n${resumeText.slice(0, 60000)}`;
+    // A resume is 1–3 pages; 24k chars (~10+ pages) covers any real CV. Smaller input = faster score.
+    `\n\nRESUME\n------\n${resumeText.slice(0, 24000)}`;
 
   try {
     // Score with a fast model (Haiku) for quick turnaround; fall back to the default model if that

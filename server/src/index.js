@@ -123,6 +123,19 @@ const port = process.env.PORT || 4000;
 app.listen(port, async () => {
   console.log(`ATS API listening on ${port}`);
   await bootstrap();
-  // Scoring is on-demand: no automatic background sweep. HR scores resumes from the pipeline
-  // (per candidate, or "Re-score failed" for a batch), so all AI usage is deliberate.
+
+  // Self-healing scoring sweep. Resumes are auto-scored on apply, but a score can be left in
+  // PENDING/FAILED if the free-tier service slept mid-call or the API briefly flaked. This picks
+  // those up automatically every few minutes so nobody has to click "Re-score". It makes an API
+  // call ONLY when such rows exist (otherwise it is just a cheap DB query), caps each run, and
+  // stops retrying a genuinely unreadable resume after a few attempts. Set AUTO_RESCORE=off to
+  // disable, or AUTO_RESCORE_MINUTES to change the cadence (default 5 minutes).
+  if ((process.env.AUTO_RESCORE || 'on').toLowerCase() !== 'off') {
+    const { rescoreFailed } = await import('./services/resume.js');
+    const mins = Math.max(2, Number(process.env.AUTO_RESCORE_MINUTES) || 5);
+    const sweep = () => rescoreFailed(5).catch((e) => console.error('auto-rescore sweep:', e.message));
+    setTimeout(sweep, 20000);                 // first pass shortly after boot
+    setInterval(sweep, mins * 60 * 1000);     // then every few minutes while the service is awake
+    console.log(`Auto-rescore sweep every ${mins} min (set AUTO_RESCORE=off to disable).`);
+  }
 });
