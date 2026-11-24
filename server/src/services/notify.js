@@ -450,14 +450,14 @@ export async function whatsappFirstInterview(appId) {
   try {
     const app = await appWithCompany(appId);
     if (!app) return { sent: false, reason: 'Application not found.' };
-    const base = PUBLIC_BASE();
-    if (!base || !app.interview_token) return { sent: false, reason: 'No interview link.' };
-    const link = `${base}/interview/${app.interview_token}`;
+    if (!app.interview_token) return { sent: false, reason: 'No interview token.' };
+    // Body vars {{1}}{{2}}{{3}}; the interview link is the dynamic URL button, which in WATI ends
+    // in a named variable {{link}} — we pass just the token, the template holds the base URL.
     return await sendTemplate(app.phone, process.env.WATI_TEMPLATE_INTERVIEW, [
       { name: '1', value: app.full_name || 'Candidate' },
       { name: '2', value: app.position_applied || '' },
       { name: '3', value: app.company_name || '' },
-      { name: '4', value: link },
+      { name: 'link', value: app.interview_token },
     ], 'ats_interview');
   } catch (e) { return { sent: false, reason: e.message }; }
 }
@@ -504,12 +504,12 @@ export async function whatsappJoined(appId) {
   try {
     const app = await appWithCompany(appId);
     if (!app) return { sent: false, reason: 'Application not found.' };
-    const base = PUBLIC_BASE();
-    const link = base && app.stage2_token ? `${base}/form/${app.stage2_token}` : '';
+    if (!app.stage2_token) return { sent: false, reason: 'No form token.' };
+    // Body vars {{1}}{{2}}; the form link is the dynamic URL button ending in {{link}}.
     return await sendTemplate(app.phone, process.env.WATI_TEMPLATE_JOINED, [
       { name: '1', value: app.full_name || 'Candidate' },
       { name: '2', value: app.company_name || '' },
-      { name: '3', value: link },
+      { name: 'link', value: app.stage2_token },
     ], 'ats_joined');
   } catch (e) { return { sent: false, reason: e.message }; }
 }
