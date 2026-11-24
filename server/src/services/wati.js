@@ -25,6 +25,60 @@ export function normalisePhone(raw) {
   return d;
 }
 
+/**
+ * Send any approved WATI template to a candidate. Business-initiated WhatsApp needs a pre-approved
+ * template, so the template name is passed in (from an env var) and params fill its {{1}}, {{2}} …
+ * Graceful: returns { sent:false, reason } instead of throwing when WATI or the template isn't set.
+ * @param {string} phone
+ * @param {string} templateName  the approved WATI template name
+ * @param {{name:string,value:string}[]} params  ordered template parameters
+ */
+export async function sendTemplate(phone, templateName, params = [], broadcastPrefix = 'ats') {
+  if (!watiConfigured()) {
+    console.log(`[wati not configured] template ${templateName || '(none)'} -> ${phone}`);
+    return { sent: false, reason: 'WATI not configured' };
+  }
+  if (!templateName) return { sent: false, reason: 'No WhatsApp template configured for this message.' };
+  const to = normalisePhone(phone);
+  if (!to) return { sent: false, reason: 'No usable phone number' };
+
+  const url = `${process.env.WATI_BASE_URL}/api/v1/sendTemplateMessage?whatsappNumber=${encodeURIComponent(to)}`;
+  let res, text;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: String(process.env.WATI_TOKEN).startsWith('Bearer')
+          ? process.env.WATI_TOKEN
+          : `Bearer ${process.env.WATI_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        template_name: templateName,
+        broadcast_name: `${broadcastPrefix}_${Date.now()}`,
+        parameters: params,
+      }),
+    });
+    text = await res.text();
+  } catch (e) {
+    console.error('WATI template request failed:', e.message);
+    return { sent: false, reason: e.message };
+  }
+
+  let data = {};
+  try { data = JSON.parse(text); } catch { /* plain text */ }
+  const declined =
+    !res.ok || data.result === false || data.result === 'false' || data.validWhatsAppNumber === false;
+  if (declined) {
+    const why =
+      data.info || data.message || (data.error && (data.error.message || data.error)) ||
+      (text ? text.slice(0, 300) : `HTTP ${res.status}`);
+    console.error(`WATI template ${templateName} failed:`, why);
+    return { sent: false, reason: String(why) };
+  }
+  return { sent: true };
+}
+
 export async function sendOtp(phone, code) {
   if (!watiConfigured()) {
     // In development the code is logged instead of sent, so the flow can be exercised without WATI.

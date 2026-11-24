@@ -181,17 +181,18 @@ function FormDetails({ d }) {
              cols={[{ key: 'name', label: 'Name' }, { key: 'relationship', label: 'Relationship' }, { key: 'contact', label: 'Contact' }]} />
       <Table title="Education"
              rows={Array.isArray(d.education)
-               ? d.education.map((r) => ({ level: r.exam, grade: r.class_marks, institution: r.institution, from: r.from, to: r.to }))
+               ? d.education.map((r) => ({ level: r.exam, grade: r.class_marks, institution: r.institution, specialisation: r.specialisation, from: r.from, to: r.to }))
                : d.education
                  ? [
-                     { level: 'SSLC', grade: d.education.sslc?.grade, institution: d.education.sslc?.school, from: d.education.sslc?.from, to: d.education.sslc?.to },
-                     { level: d.education.hsc?.type ? `HSC · ${d.education.hsc.type}` : 'HSC', grade: d.education.hsc?.grade, institution: d.education.hsc?.school, from: d.education.hsc?.from, to: d.education.hsc?.to },
-                     { level: d.education.ug?.degree ? `Undergraduate · ${d.education.ug.degree}` : 'Undergraduate', grade: d.education.ug?.grade, institution: d.education.ug?.college, from: d.education.ug?.from, to: d.education.ug?.to },
-                     { level: d.education.pg?.degree ? `Post Graduate · ${d.education.pg.degree}` : 'Post Graduate', grade: d.education.pg?.grade, institution: d.education.pg?.college, from: d.education.pg?.from, to: d.education.pg?.to },
-                   ].filter((r) => r.grade || r.institution || r.from || r.to)
+                     { level: 'SSLC', grade: d.education.sslc?.grade, institution: d.education.sslc?.school, specialisation: '', from: d.education.sslc?.from, to: d.education.sslc?.to },
+                     { level: d.education.hsc?.type ? `HSC · ${d.education.hsc.type}` : 'HSC', grade: d.education.hsc?.grade, institution: d.education.hsc?.school, specialisation: d.education.hsc?.specialisation, from: d.education.hsc?.from, to: d.education.hsc?.to },
+                     { level: d.education.ug?.degree ? `Undergraduate · ${d.education.ug.degree}` : 'Undergraduate', grade: d.education.ug?.grade, institution: d.education.ug?.college, specialisation: d.education.ug?.specialisation, from: d.education.ug?.from, to: d.education.ug?.to },
+                     { level: d.education.pg?.degree ? `Post Graduate · ${d.education.pg.degree}` : 'Post Graduate', grade: d.education.pg?.grade, institution: d.education.pg?.college, specialisation: d.education.pg?.specialisation, from: d.education.pg?.from, to: d.education.pg?.to },
+                   ].filter((r) => r.grade || r.institution || r.specialisation || r.from || r.to)
                  : []}
              cols={[{ key: 'level', label: 'Level' }, { key: 'grade', label: 'Grade / %' },
-                    { key: 'institution', label: 'School / College' }, { key: 'from', label: 'From' }, { key: 'to', label: 'To' }]} />
+                    { key: 'institution', label: 'School / College' }, { key: 'specialisation', label: 'Specialisation' },
+                    { key: 'from', label: 'From' }, { key: 'to', label: 'To' }]} />
       <Table title="Previous employment" rows={d.employment}
              cols={[{ key: 'employer', label: 'Employer' }, { key: 'designation_leaving', label: 'Designation (leaving)' },
                     { key: 'from', label: 'From' }, { key: 'to', label: 'To' },

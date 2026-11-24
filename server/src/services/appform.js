@@ -39,16 +39,16 @@ const txt = (s) => (s == null || s === '' ? '—' : String(s));
 
 function educationRows(education) {
   if (Array.isArray(education)) {
-    return education.map((r) => ({ level: r.exam, grade: r.class_marks, institution: r.institution, from: r.from, to: r.to }));
+    return education.map((r) => ({ level: r.exam, grade: r.class_marks, institution: r.institution, specialisation: r.specialisation, from: r.from, to: r.to }));
   }
   if (!education) return [];
   const e = education;
   return [
-    { level: 'SSLC', grade: e.sslc?.grade, institution: e.sslc?.school, from: e.sslc?.from, to: e.sslc?.to },
-    { level: e.hsc?.type ? `HSC (${e.hsc.type})` : 'HSC', grade: e.hsc?.grade, institution: e.hsc?.school, from: e.hsc?.from, to: e.hsc?.to },
-    { level: e.ug?.degree ? `UG — ${e.ug.degree}` : 'Undergraduate', grade: e.ug?.grade, institution: e.ug?.college, from: e.ug?.from, to: e.ug?.to },
-    { level: e.pg?.degree ? `PG — ${e.pg.degree}` : 'Post Graduate', grade: e.pg?.grade, institution: e.pg?.college, from: e.pg?.from, to: e.pg?.to },
-  ].filter((r) => r.grade || r.institution || r.from || r.to);
+    { level: 'SSLC', grade: e.sslc?.grade, institution: e.sslc?.school, specialisation: '', from: e.sslc?.from, to: e.sslc?.to },
+    { level: e.hsc?.type ? `HSC (${e.hsc.type})` : 'HSC', grade: e.hsc?.grade, institution: e.hsc?.school, specialisation: e.hsc?.specialisation, from: e.hsc?.from, to: e.hsc?.to },
+    { level: e.ug?.degree ? `UG — ${e.ug.degree}` : 'Undergraduate', grade: e.ug?.grade, institution: e.ug?.college, specialisation: e.ug?.specialisation, from: e.ug?.from, to: e.ug?.to },
+    { level: e.pg?.degree ? `PG — ${e.pg.degree}` : 'Post Graduate', grade: e.pg?.grade, institution: e.pg?.college, specialisation: e.pg?.specialisation, from: e.pg?.from, to: e.pg?.to },
+  ].filter((r) => r.grade || r.institution || r.specialisation || r.from || r.to);
 }
 
 /** @returns {Promise<Buffer>} */
@@ -205,8 +205,9 @@ export function renderApplicationFormPdf(app, d = {}) {
 
     heading('Education');
     table(
-      [{ key: 'level', label: 'Level', w: 3 }, { key: 'grade', label: 'Grade / %', w: 2 },
-       { key: 'institution', label: 'School / College', w: 4 }, { key: 'from', label: 'From', w: 1.5 }, { key: 'to', label: 'To', w: 1.5 }],
+      [{ key: 'level', label: 'Level', w: 2.6 }, { key: 'grade', label: 'Grade / %', w: 1.8 },
+       { key: 'institution', label: 'School / College', w: 3.2 }, { key: 'specialisation', label: 'Specialisation', w: 2.6 },
+       { key: 'from', label: 'From', w: 1.2 }, { key: 'to', label: 'To', w: 1.2 }],
       educationRows(d.education)
     );
 

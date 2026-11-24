@@ -135,9 +135,9 @@ export default function FullForm() {
   // Four fixed education levels, each with its own fields.
   const [edu, setEdu] = useState({
     sslc: { grade: '', school: '', from: '', to: '' },
-    hsc:  { type: '', grade: '', school: '', from: '', to: '' },
-    ug:   { degree: '', grade: '', college: '', from: '', to: '' },
-    pg:   { degree: '', grade: '', college: '', from: '', to: '' },
+    hsc:  { type: '', grade: '', school: '', specialisation: '', from: '', to: '' },
+    ug:   { degree: '', grade: '', college: '', specialisation: '', from: '', to: '' },
+    pg:   { degree: '', grade: '', college: '', specialisation: '', from: '', to: '' },
   });
   const eduSet = (level, key, val) => setEdu((e) => ({ ...e, [level]: { ...e[level], [key]: val } }));
   const yearSelect = (level, key, ph) => (
@@ -361,6 +361,8 @@ export default function FullForm() {
                      onChange={(e) => eduSet('hsc', 'grade', e.target.value)} />
               <input placeholder="School name" value={edu.hsc.school}
                      onChange={(e) => eduSet('hsc', 'school', e.target.value)} />
+              <input placeholder="Specialisation / stream" value={edu.hsc.specialisation}
+                     onChange={(e) => eduSet('hsc', 'specialisation', e.target.value)} />
               {yearSelect('hsc', 'from', 'From year')}
               {yearSelect('hsc', 'to', 'To year')}
             </div>
@@ -377,6 +379,8 @@ export default function FullForm() {
                      onChange={(e) => eduSet('ug', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.ug.college}
                      onChange={(e) => eduSet('ug', 'college', e.target.value)} />
+              <input placeholder="Specialisation / branch" value={edu.ug.specialisation}
+                     onChange={(e) => eduSet('ug', 'specialisation', e.target.value)} />
               {yearSelect('ug', 'from', 'From year')}
               {yearSelect('ug', 'to', 'To year')}
             </div>
@@ -393,6 +397,8 @@ export default function FullForm() {
                      onChange={(e) => eduSet('pg', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.pg.college}
                      onChange={(e) => eduSet('pg', 'college', e.target.value)} />
+              <input placeholder="Specialisation / branch" value={edu.pg.specialisation}
+                     onChange={(e) => eduSet('pg', 'specialisation', e.target.value)} />
               {yearSelect('pg', 'from', 'From year')}
               {yearSelect('pg', 'to', 'To year')}
             </div>

@@ -2,6 +2,7 @@ import { one, q } from '../db.js';
 import { sendMail, graphConfigured } from './graph.js';
 import { getFile, putFile } from './storage.js';
 import { renderApplicationFormPdf, applicationFormKey, applicationFormFilename } from './appform.js';
+import { sendTemplate } from './wati.js';
 
 const MIME = {
   '.pdf': 'application/pdf',
@@ -419,4 +420,135 @@ export async function fileAndEmailApplicationForm(appId) {
   } catch (err) {
     return { sent: false, saved: false, reason: err.message };
   }
+}
+
+// ===========================================================================
+// Candidate & HR reminders — WhatsApp (WATI templates) + email
+// ===========================================================================
+
+const PUBLIC_BASE = () => (process.env.PUBLIC_WEB_URL || '').replace(/\/+$/, '');
+const HR_REPLY = () => process.env.GRAPH_MAIL_FROM || process.env.GRAPH_DRIVE_USER || 'hr@bharatsteels.in';
+
+/** HR recipient addresses for a company: its active HR admins, plus NOTIFY_EMAILS, else a fallback. */
+async function hrRecipients(companyId) {
+  const { rows } = await q(
+    `SELECT DISTINCT u.email FROM users u JOIN user_companies uc ON uc.user_id = u.id
+      WHERE uc.company_id = $1 AND u.active AND u.email IS NOT NULL AND u.email <> ''`,
+    [companyId]
+  );
+  const extra = (process.env.NOTIFY_EMAILS || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const list = [...new Set([...rows.map((r) => r.email), ...extra])];
+  return list.length ? list : ['hr@bharatsteels.in'];
+}
+
+const appWithCompany = (appId) =>
+  one(`SELECT a.*, c.code AS company_code, c.name AS company_name
+         FROM applications a JOIN companies c ON c.id = a.company_id WHERE a.id = $1`, [appId]);
+
+/** WhatsApp the first-round interview invite to the candidate (the email goes via emailAiInterview). */
+export async function whatsappFirstInterview(appId) {
+  try {
+    const app = await appWithCompany(appId);
+    if (!app) return { sent: false, reason: 'Application not found.' };
+    const base = PUBLIC_BASE();
+    if (!base || !app.interview_token) return { sent: false, reason: 'No interview link.' };
+    const link = `${base}/interview/${app.interview_token}`;
+    return await sendTemplate(app.phone, process.env.WATI_TEMPLATE_INTERVIEW, [
+      { name: '1', value: app.full_name || 'Candidate' },
+      { name: '2', value: app.position_applied || '' },
+      { name: '3', value: app.company_name || '' },
+      { name: '4', value: link },
+    ], 'ats_interview');
+  } catch (e) { return { sent: false, reason: e.message }; }
+}
+
+/** Email + WhatsApp the candidate that they've been selected after the first round. */
+export async function notifyApplicantSelected(appId) {
+  const out = { email: false, whatsapp: false };
+  try {
+    const app = await appWithCompany(appId);
+    if (!app) return { ...out, reason: 'Application not found.' };
+
+    if ((graphConfigured() || process.env.BREVO_API_KEY) && app.email) {
+      const html = `
+        <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#101519">
+          <p>Dear ${esc(app.full_name)},</p>
+          <p>Congratulations! Following your first-round interview, you have been
+             <strong>selected</strong> for the next stage for the role of
+             <strong>${esc(app.position_applied)}</strong> at ${esc(app.company_name)}.</p>
+          <p>Our HR team will be in touch shortly with the details of the next step.</p>
+          <p style="color:#697178;font-size:13px;margin-top:18px">Reference: ${esc(app.ref_code)}.
+             If you have any questions, simply reply to this email.</p>
+          <p>Warm regards,<br>HR Team, ${esc(app.company_name)}</p>
+        </div>`;
+      const r = await sendMail({
+        to: app.email,
+        subject: `You're selected — ${app.company_code} · ${app.ref_code}`,
+        html, replyTo: HR_REPLY(), from: process.env.NOTIFY_FROM || undefined,
+      });
+      out.email = !!r.sent;
+    }
+
+    const w = await sendTemplate(app.phone, process.env.WATI_TEMPLATE_SELECTED, [
+      { name: '1', value: app.full_name || 'Candidate' },
+      { name: '2', value: app.position_applied || '' },
+      { name: '3', value: app.company_name || '' },
+    ], 'ats_selected');
+    out.whatsapp = !!w.sent;
+  } catch (e) { out.reason = e.message; }
+  return out;
+}
+
+/** WhatsApp the welcome + full-form link on JOINED (the email goes via emailJoiningForm). */
+export async function whatsappJoined(appId) {
+  try {
+    const app = await appWithCompany(appId);
+    if (!app) return { sent: false, reason: 'Application not found.' };
+    const base = PUBLIC_BASE();
+    const link = base && app.stage2_token ? `${base}/form/${app.stage2_token}` : '';
+    return await sendTemplate(app.phone, process.env.WATI_TEMPLATE_JOINED, [
+      { name: '1', value: app.full_name || 'Candidate' },
+      { name: '2', value: app.company_name || '' },
+      { name: '3', value: link },
+    ], 'ats_joined');
+  } catch (e) { return { sent: false, reason: e.message }; }
+}
+
+/** Email HR (only) that a candidate finished the first-round interview, with their details + score. */
+export async function emailHrInterviewComplete(appId) {
+  try {
+    const app = await appWithCompany(appId);
+    if (!app) return { sent: false, reason: 'Application not found.' };
+    if (!graphConfigured() && !process.env.BREVO_API_KEY) return { sent: false, reason: 'Email not configured.' };
+
+    const recipients = await hrRecipients(app.company_id);
+    const base = PUBLIC_BASE();
+    const link = base ? `${base}/applications/${app.id}` : null;
+    const score = app.interview_score != null ? `${app.interview_score} / 10` : 'pending';
+    const row = (k, v) => `<tr><td style="padding:3px 14px 3px 0;color:#697178">${k}</td><td>${esc(v) || '—'}</td></tr>`;
+
+    const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:580px;color:#101519">
+        <p style="font-size:15px;margin:0 0 4px"><strong>First-round interview completed</strong></p>
+        <p style="color:#697178;margin:0 0 14px">${esc(app.full_name)} has completed the first-round interview.</p>
+        <table style="border-collapse:collapse;font-size:13px">
+          ${row('Candidate', app.full_name)}
+          ${row('Reference', app.ref_code)}
+          ${row('Position', app.position_applied)}
+          ${row('Company', app.company_name)}
+          ${row('Phone', app.phone)}
+          ${row('Email', app.email)}
+          <tr><td style="padding:3px 14px 3px 0;color:#697178">Interview score</td><td><strong>${esc(score)}</strong></td></tr>
+        </table>
+        ${link ? `<p style="margin:18px 0"><a href="${link}" style="background:#0a2b66;color:#fff;text-decoration:none;padding:10px 18px;border-radius:4px;font-weight:600;display:inline-block">Open in the ATS</a></p>` : ''}
+        <p style="color:#8b939a;font-size:12px;margin:0">Sent automatically by the Bharat Steel Group recruitment portal.</p>
+      </div>`;
+
+    const r = await sendMail({
+      to: recipients,
+      subject: `Interview completed — ${app.full_name} (${app.company_code} · ${app.ref_code})`,
+      html, replyTo: app.email, from: process.env.NOTIFY_FROM || undefined,
+    });
+    return { sent: !!r.sent, reason: r.reason };
+  } catch (e) { return { sent: false, reason: e.message }; }
 }

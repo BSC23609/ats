@@ -3,7 +3,7 @@ import path from 'path';
 import multer from 'multer';
 import { one, q, tx } from '../db.js';
 import { extractText, summariseResume } from '../services/resume.js';
-import { notifyHrOfApplication, fileAndEmailApplicationForm } from '../services/notify.js';
+import { notifyHrOfApplication, fileAndEmailApplicationForm, emailHrInterviewComplete } from '../services/notify.js';
 import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
@@ -281,7 +281,12 @@ async function finishInterview(app, transcript, res) {
     .catch((err) =>
       q(`UPDATE applications SET interview_result=$2 WHERE id=$1`,
         [app.id, JSON.stringify({ ...baseResult, score: null, error: String(err.message).slice(0, 300) })])
-        .catch(() => {}));
+        .catch(() => {}))
+    // Once the score is written, email HR that the first-round interview is complete (with details).
+    .finally(() =>
+      emailHrInterviewComplete(app.id)
+        .then((out) => { if (!out.sent) console.error('HR interview-complete email not sent:', out.reason); })
+        .catch((e) => console.error('HR interview-complete email error:', e.message)));
 }
 
 /** Candidate opens the interview link — basic info + whether it's already done. */

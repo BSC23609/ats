@@ -7,7 +7,10 @@ import { putFile, getFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
 import { toText, describeRange } from '../services/html.js';
 import { syncWorkbook } from '../services/workbook.js';
-import { notifyHrOfApplication, emailAiInterview, emailJoiningForm, fileAndEmailApplicationForm } from '../services/notify.js';
+import {
+  notifyHrOfApplication, emailAiInterview, emailJoiningForm, fileAndEmailApplicationForm,
+  whatsappFirstInterview, notifyApplicantSelected, whatsappJoined,
+} from '../services/notify.js';
 import { askRecruiter } from '../services/recruiter.js';
 
 const r = Router();
@@ -443,6 +446,17 @@ r.post('/:id/status', async (req, res) => {
         }
       })
       .catch((e) => console.error('AI interview email error:', e.message));
+    // Same invite over WhatsApp.
+    whatsappFirstInterview(app.id)
+      .then((out) => { if (!out.sent) console.error('interview WhatsApp not sent:', out.reason); })
+      .catch((e) => console.error('interview WhatsApp error:', e.message));
+  }
+
+  // On SELECTED (shortlisted after the first round): tell the candidate by email + WhatsApp.
+  if (status === 'SELECTED') {
+    notifyApplicantSelected(app.id)
+      .then((out) => { if (!out.email && !out.whatsapp) console.error('selected notice not sent:', out.reason); })
+      .catch((e) => console.error('selected notice error:', e.message));
   }
 
   // On JOINED: email the new joiner their full application form link (onboarding paperwork), and
@@ -452,6 +466,10 @@ r.post('/:id/status', async (req, res) => {
     emailJoiningForm(app.id)
       .then((out) => { if (!out.sent) console.error('joining form email not sent:', out.reason); })
       .catch((e) => console.error('joining form email error:', e.message));
+    // Same welcome + form link over WhatsApp.
+    whatsappJoined(app.id)
+      .then((out) => { if (!out.sent) console.error('joined WhatsApp not sent:', out.reason); })
+      .catch((e) => console.error('joined WhatsApp error:', e.message));
     syncWorkbook();
   }
 });
