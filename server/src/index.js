@@ -40,6 +40,10 @@ app.use(
 );
 app.use(express.json({ limit: '2mb' }));
 
+// Ultra-light liveness ping — no database or OneDrive work — for an uptime pinger (e.g. UptimeRobot)
+// to keep the free-tier service awake so resume scoring has no cold-start delay.
+app.get('/api/ping', (_req, res) => res.json({ ok: true, t: Date.now() }));
+
 app.get('/api/health', async (_req, res) => {
   const health = {
     ok: true,
