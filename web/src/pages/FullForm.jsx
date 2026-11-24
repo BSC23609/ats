@@ -65,6 +65,25 @@ const SPECIALISATIONS = [
   'Mathematics', 'Physics', 'Chemistry', 'Statistics', 'Computer Applications', 'Other',
 ];
 
+// HSC specialisation options, by type.
+const ITI_TRADES = [
+  'Fitter', 'Turner', 'Machinist', 'Welder', 'Electrician', 'Wireman', 'Electronics Mechanic',
+  'Instrument Mechanic', 'Mechanic (Motor Vehicle)', 'Mechanic Diesel', 'Draughtsman (Mechanical)',
+  'Draughtsman (Civil)', 'Tool & Die Maker', 'Sheet Metal Worker', 'Foundryman',
+  'Refrigeration & Air Conditioning', 'Plumber', 'Surveyor', 'COPA', 'Painter', 'Other',
+];
+const POLY_BRANCHES = [
+  'Mechanical Engineering', 'Civil Engineering', 'Electrical & Electronics Engineering (EEE)',
+  'Electrical Engineering', 'Electronics & Communication Engineering (ECE)', 'Computer Engineering',
+  'Automobile Engineering', 'Mechatronics Engineering', 'Instrumentation & Control Engineering',
+  'Production / Tool & Die Engineering', 'Metallurgical Engineering', 'Chemical Engineering',
+  'Information Technology', 'Other',
+];
+const TWELFTH_STREAMS = [
+  'Science (Maths)', 'Science (Biology)', 'Science (Computer Science)', 'Commerce',
+  'Arts / Humanities', 'Vocational', 'Other',
+];
+
 /* Repeatable table blocks — children, siblings, emergency contacts, education, employment */
 function Rows({ label, cols, rows, setRows, blank, min = 1 }) {
   const update = (i, key, value) => setRows(rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
@@ -148,11 +167,14 @@ export default function FullForm() {
   // Four fixed education levels, each with its own fields.
   const [edu, setEdu] = useState({
     sslc: { grade: '', school: '', from: '', to: '' },
-    hsc:  { type: '', grade: '', school: '', specialisation: '', from: '', to: '' },
-    ug:   { degree: '', grade: '', college: '', specialisation: '', from: '', to: '' },
-    pg:   { degree: '', grade: '', college: '', specialisation: '', from: '', to: '' },
+    hsc:  { type: '', grade: '', school: '', specialisation: '', specialisation_other: '', from: '', to: '' },
+    ug:   { degree: '', grade: '', college: '', specialisation: '', specialisation_other: '', from: '', to: '' },
+    pg:   { degree: '', grade: '', college: '', specialisation: '', specialisation_other: '', from: '', to: '' },
   });
   const eduSet = (level, key, val) => setEdu((e) => ({ ...e, [level]: { ...e[level], [key]: val } }));
+  // HSC specialisation options depend on the type (ITI trade / Polytechnic branch / 12th stream).
+  const hscSpecOptions = (type) =>
+    type === 'ITI' ? ITI_TRADES : type === 'Polytechnic' ? POLY_BRANCHES : type === '12th' ? TWELFTH_STREAMS : [];
   const yearSelect = (level, key, ph) => (
     <select value={edu[level][key]} onChange={(e) => eduSet(level, key, e.target.value)}>
       <option value="">{ph}</option>
@@ -175,12 +197,24 @@ export default function FullForm() {
     setError('');
     const fd = Object.fromEntries(new FormData(e.target));
 
+    // Resolve "Other" specialisations to the typed value, and drop the helper field before saving.
+    const resolveSpec = (o) => {
+      const out = { ...o };
+      ['hsc', 'ug', 'pg'].forEach((k) => {
+        if (!out[k]) return;
+        const { specialisation_other, ...rest } = out[k];
+        if (rest.specialisation === 'Other') rest.specialisation = (specialisation_other || '').trim() || 'Other';
+        out[k] = rest;
+      });
+      return out;
+    };
+
     const details = {
       ...fd,
       children: children.filter((c) => c.name),
       siblings: siblings.filter((s) => s.relation),
       emergency_contacts: emergency.filter((c) => c.name),
-      education: edu,
+      education: resolveSpec(edu),
       employment: employment.filter((c) => c.employer),
       previous_hr_contacts: referees.filter((c) => c.name),
       submitted_at: new Date().toISOString(),
@@ -363,18 +397,26 @@ export default function FullForm() {
           <div style={{ marginBottom: 14 }}>
             <label>HSC</label>
             <div className="field-row">
-              <select value={edu.hsc.type} onChange={(e) => eduSet('hsc', 'type', e.target.value)}>
+              <select value={edu.hsc.type}
+                      onChange={(e) => setEdu((s) => ({ ...s, hsc: { ...s.hsc, type: e.target.value, specialisation: '', specialisation_other: '' } }))}>
                 <option value="" disabled>Select</option>
                 <option>12th</option>
                 <option>ITI</option>
                 <option>Polytechnic</option>
               </select>
+              <select value={edu.hsc.specialisation} disabled={!edu.hsc.type}
+                      onChange={(e) => eduSet('hsc', 'specialisation', e.target.value)}>
+                <option value="" disabled>{edu.hsc.type ? 'Specialisation' : 'Select type first'}</option>
+                {hscSpecOptions(edu.hsc.type).map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
+              {edu.hsc.specialisation === 'Other' && (
+                <input placeholder="Type specialisation" value={edu.hsc.specialisation_other}
+                       onChange={(e) => eduSet('hsc', 'specialisation_other', e.target.value)} />
+              )}
               <input placeholder="Grade / Percentage / CGP" value={edu.hsc.grade}
                      onChange={(e) => eduSet('hsc', 'grade', e.target.value)} />
               <input placeholder="School name" value={edu.hsc.school}
                      onChange={(e) => eduSet('hsc', 'school', e.target.value)} />
-              <input placeholder="Specialisation / stream" value={edu.hsc.specialisation}
-                     onChange={(e) => eduSet('hsc', 'specialisation', e.target.value)} />
               {yearSelect('hsc', 'from', 'From year')}
               {yearSelect('hsc', 'to', 'To year')}
             </div>
@@ -391,6 +433,10 @@ export default function FullForm() {
                 <option value="" disabled>Specialisation</option>
                 {SPECIALISATIONS.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
+              {edu.ug.specialisation === 'Other' && (
+                <input placeholder="Type specialisation" value={edu.ug.specialisation_other}
+                       onChange={(e) => eduSet('ug', 'specialisation_other', e.target.value)} />
+              )}
               <input placeholder="Grade / Percentage / CGP" value={edu.ug.grade}
                      onChange={(e) => eduSet('ug', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.ug.college}
@@ -411,6 +457,10 @@ export default function FullForm() {
                 <option value="" disabled>Specialisation</option>
                 {SPECIALISATIONS.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
+              {edu.pg.specialisation === 'Other' && (
+                <input placeholder="Type specialisation" value={edu.pg.specialisation_other}
+                       onChange={(e) => eduSet('pg', 'specialisation_other', e.target.value)} />
+              )}
               <input placeholder="Grade / Percentage / CGP" value={edu.pg.grade}
                      onChange={(e) => eduSet('pg', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.pg.college}
