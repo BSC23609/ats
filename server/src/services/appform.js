@@ -11,12 +11,21 @@ import { safeName } from './graph.js';
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-let LOGO = null;
-try { LOGO = fs.readFileSync(path.join(__dirname, '../assets/bsc-logo.png')); }
-catch { /* logo optional — the PDF still renders without it */ }
-let GROUP_NAME = null;
-try { GROUP_NAME = fs.readFileSync(path.join(__dirname, '../assets/group-name.png')); }
-catch { /* optional — falls back to text */ }
+const loadAsset = (f) => {
+  try { return fs.readFileSync(path.join(__dirname, '../assets/', f)); } catch { return null; }
+};
+
+// Per-company header branding: a square logo on the left, a name wordmark on the right.
+// nameAspect = width/height of the name image, used to centre it against the logo.
+const BRANDS = {
+  BSC:     { logo: loadAsset('bsc-logo.png'),     name: loadAsset('group-name.png'),  nameAspect: 375 / 133 },
+  METFRAA: { logo: loadAsset('metfraa-logo.png'), name: loadAsset('metfraa-name.png'), nameAspect: 500 / 138 },
+};
+function brandFor(companyCode) {
+  const c = String(companyCode || '').toUpperCase();
+  if (c.startsWith('MET')) return BRANDS.METFRAA;
+  return BRANDS.BSC; // BSC, G2, and anything else fall back to the group lockup
+}
 
 const NAVY = '#0A2B66';
 const INK = '#1f2430';
@@ -135,18 +144,19 @@ export function renderApplicationFormPdf(app, d = {}) {
       doc.moveDown(0.4);
     };
 
-    // ---- Header band: company logo on the left, group name on the right ----
+    // ---- Header band: the candidate's company logo on the left, its name wordmark on the right ----
+    const brand = brandFor(app.company_code);
     const logoW = 60;
-    if (LOGO) {
-      try { doc.image(LOGO, M.left, M.top, { width: logoW }); } catch { /* ignore */ }
+    if (brand.logo) {
+      try { doc.image(brand.logo, M.left, M.top, { width: logoW }); } catch { /* ignore */ }
     }
-    if (GROUP_NAME) {
+    if (brand.name) {
       const gw = 150;
-      const gh = (gw * 133) / 375; // keep the wordmark's aspect ratio
-      try { doc.image(GROUP_NAME, W - M.right - gw, M.top + (logoW - gh) / 2, { width: gw }); } catch { /* ignore */ }
+      const gh = gw / brand.nameAspect; // keep the wordmark's aspect ratio
+      try { doc.image(brand.name, W - M.right - gw, M.top + (logoW - gh) / 2, { width: gw }); } catch { /* ignore */ }
     } else {
       doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(15)
-        .text('THE BHARAT STEEL GROUP', M.left, M.top + 22, { width: contentW, align: 'right' });
+        .text(app.company_name || 'The Bharat Steel Group', M.left, M.top + 22, { width: contentW, align: 'right' });
     }
     doc.y = M.top + logoW + 8;
     doc.x = M.left;

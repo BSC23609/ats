@@ -324,8 +324,7 @@ export default function FullForm() {
           </div>
           <Rows label="Siblings" min={0}
                 cols={[
-                  { key: 'relation', label: 'Sibling', type: 'select',
-                    options: ['Elder Sister', 'Younger Sister', 'Elder Brother', 'Younger Brother'] },
+                  { key: 'relation', label: 'Relationship (e.g. Elder brother)' },
                   { key: 'age', label: 'Age', type: 'number' },
                   { key: 'gender', label: 'Gender', type: 'select', options: ['Female', 'Male'] },
                   { key: 'occupation', label: 'Occupation / place' },
