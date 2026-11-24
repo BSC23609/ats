@@ -388,14 +388,14 @@ export default function FullForm() {
                 <option value="" disabled>Degree</option>
                 {UG_DEGREES.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
-              <input placeholder="Grade / Percentage / CGPA" value={edu.ug.grade}
-                     onChange={(e) => eduSet('ug', 'grade', e.target.value)} />
-              <input placeholder="College name" value={edu.ug.college}
-                     onChange={(e) => eduSet('ug', 'college', e.target.value)} />
               <select value={edu.ug.specialisation} onChange={(e) => eduSet('ug', 'specialisation', e.target.value)}>
                 <option value="" disabled>Specialisation</option>
                 {SPECIALISATIONS.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
+              <input placeholder="Grade / Percentage / CGPA" value={edu.ug.grade}
+                     onChange={(e) => eduSet('ug', 'grade', e.target.value)} />
+              <input placeholder="College name" value={edu.ug.college}
+                     onChange={(e) => eduSet('ug', 'college', e.target.value)} />
               {yearSelect('ug', 'from', 'From year')}
               {yearSelect('ug', 'to', 'To year')}
             </div>
@@ -408,14 +408,14 @@ export default function FullForm() {
                 <option value="" disabled>Degree</option>
                 {PG_DEGREES.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
-              <input placeholder="Grade / Percentage / CGPA" value={edu.pg.grade}
-                     onChange={(e) => eduSet('pg', 'grade', e.target.value)} />
-              <input placeholder="College name" value={edu.pg.college}
-                     onChange={(e) => eduSet('pg', 'college', e.target.value)} />
               <select value={edu.pg.specialisation} onChange={(e) => eduSet('pg', 'specialisation', e.target.value)}>
                 <option value="" disabled>Specialisation</option>
                 {SPECIALISATIONS.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
+              <input placeholder="Grade / Percentage / CGPA" value={edu.pg.grade}
+                     onChange={(e) => eduSet('pg', 'grade', e.target.value)} />
+              <input placeholder="College name" value={edu.pg.college}
+                     onChange={(e) => eduSet('pg', 'college', e.target.value)} />
               {yearSelect('pg', 'from', 'From year')}
               {yearSelect('pg', 'to', 'To year')}
             </div>
