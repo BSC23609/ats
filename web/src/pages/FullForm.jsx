@@ -351,7 +351,7 @@ export default function FullForm() {
           <div style={{ marginBottom: 14 }}>
             <label>SSLC</label>
             <div className="field-row">
-              <input placeholder="Grade / Percentage / CGP" value={edu.sslc.grade}
+              <input placeholder="Grade / % / CGP" value={edu.sslc.grade}
                      onChange={(e) => eduSet('sslc', 'grade', e.target.value)} />
               <input placeholder="School name" value={edu.sslc.school}
                      onChange={(e) => eduSet('sslc', 'school', e.target.value)} />
@@ -369,7 +369,7 @@ export default function FullForm() {
                 <option>ITI</option>
                 <option>Polytechnic</option>
               </select>
-              <input placeholder="Grade / Percentage / CGP" value={edu.hsc.grade}
+              <input placeholder="Grade / % / CGP" value={edu.hsc.grade}
                      onChange={(e) => eduSet('hsc', 'grade', e.target.value)} />
               <input placeholder="School name" value={edu.hsc.school}
                      onChange={(e) => eduSet('hsc', 'school', e.target.value)} />
@@ -391,7 +391,7 @@ export default function FullForm() {
                 <option value="" disabled>Specialisation</option>
                 {SPECIALISATIONS.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
-              <input placeholder="Grade / Percentage / CGP" value={edu.ug.grade}
+              <input placeholder="Grade / % / CGP" value={edu.ug.grade}
                      onChange={(e) => eduSet('ug', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.ug.college}
                      onChange={(e) => eduSet('ug', 'college', e.target.value)} />
@@ -411,7 +411,7 @@ export default function FullForm() {
                 <option value="" disabled>Specialisation</option>
                 {SPECIALISATIONS.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
-              <input placeholder="Grade / Percentage / CGP" value={edu.pg.grade}
+              <input placeholder="Grade / % / CGP" value={edu.pg.grade}
                      onChange={(e) => eduSet('pg', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.pg.college}
                      onChange={(e) => eduSet('pg', 'college', e.target.value)} />
