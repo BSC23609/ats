@@ -2,7 +2,7 @@ import { Router } from 'express';
 import path from 'path';
 import multer from 'multer';
 import { one, q, tx } from '../db.js';
-import { extractText, summariseResume } from '../services/resume.js';
+import { extractText, summariseResume, rescoreApplication } from '../services/resume.js';
 import { notifyHrOfApplication, fileAndEmailApplicationForm, emailHrInterviewComplete } from '../services/notify.js';
 import { putFile } from '../services/storage.js';
 import { safeName } from '../services/graph.js';
@@ -172,10 +172,18 @@ r.post('/apply', upload.single('resume'), async (req, res) => {
     // and the outcome is recorded on the row (notify_status) for the pipeline's send-log column.
     notifyHrOfApplication(app.id).catch((e) => console.error('HR notify failed:', e.message));
 
-    // Scoring is on-demand: we do NOT auto-read/score the resume. HR scores from the pipeline when
-    // they choose to, which keeps AI usage deliberate. Mark the row so the pipeline shows a Score button.
-    await q(`UPDATE applications SET ai_status=$2 WHERE id=$1`,
-            [app.id, req.file ? 'NOT_SCORED' : 'SKIPPED']);
+    // Auto-score the resume in the background (fire-and-forget) so the score is ready by the time HR
+    // opens the pipeline. The candidate is never held up. No resume → nothing to score.
+    if (req.file) {
+      await q(`UPDATE applications SET ai_status='PENDING' WHERE id=$1`, [app.id]);
+      rescoreApplication(app.id).catch(async (e) => {
+        console.error('auto-score failed:', e.message);
+        await q(`UPDATE applications SET ai_status='FAILED', ai_error=$2 WHERE id=$1`,
+                [app.id, (e.message || 'failed').slice(0, 300)]).catch(() => {});
+      });
+    } else {
+      await q(`UPDATE applications SET ai_status='SKIPPED' WHERE id=$1`, [app.id]);
+    }
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
