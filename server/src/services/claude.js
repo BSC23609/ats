@@ -52,14 +52,14 @@ async function call(body, { retries = 4 } = {}) {
 
 /** Ask Claude and parse a single JSON object back. Works on any model (no assistant prefill).
  *  `model` can override the default (e.g. a faster model for resume scoring). */
-export async function claudeJSON(system, prompt, maxTokens = 1500, model = MODEL) {
+export async function claudeJSON(system, prompt, maxTokens = 1500, model = MODEL, opts = {}) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set.');
   const text = await call({
     model: (model || MODEL).trim(),
     max_tokens: maxTokens,
     system: `${system}\n\nRespond with ONLY a single valid JSON object — no markdown, no code fences, no commentary before or after.`,
     messages: [{ role: 'user', content: prompt }],
-  });
+  }, opts);
   let raw = text.replace(/```json|```/g, '').trim();
   // Isolate the JSON object even if the model adds any stray text around it.
   const start = raw.indexOf('{');

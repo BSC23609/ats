@@ -205,7 +205,8 @@ export async function summariseResume(
     const fastModel = process.env.ANTHROPIC_SCORING_MODEL || 'claude-haiku-5-5';
     let summary;
     try {
-      summary = await claudeJSON(INSTRUCTIONS, prompt, 1500, fastModel);
+      // Fail fast on the fast model (1 quick retry) so a flake drops to the main model promptly.
+      summary = await claudeJSON(INSTRUCTIONS, prompt, 1500, fastModel, { retries: 1 });
     } catch (err) {
       // The fast model can flake — not on the plan, an off-format reply, a transient blip. Fall back
       // to the default model once before giving up, so a weak fast model doesn't leave it unscored.
