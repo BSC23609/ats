@@ -74,9 +74,9 @@ export async function scoreInterview({ position, company, jobDescription, transc
   const fastModel = process.env.ANTHROPIC_SCORING_MODEL || 'claude-haiku-5-5';
   let out;
   try {
-    out = await claudeJSON(system, prompt, 1024, fastModel, { retries: 1 });
+    out = await claudeJSON(system, prompt, 1500, fastModel, { retries: 1 });
   } catch (err) {
-    out = await claudeJSON(system, prompt, 1024); // fall back to the default model on any fast-model error
+    out = await claudeJSON(system, prompt, 1500); // fall back to the default model on any fast-model error
   }
   let score = Number(out?.score);
   if (!Number.isFinite(score)) score = null;

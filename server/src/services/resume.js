@@ -206,12 +206,12 @@ export async function summariseResume(
     let summary;
     try {
       // Fail fast on the fast model (1 quick retry) so a flake drops to the main model promptly.
-      summary = await claudeJSON(INSTRUCTIONS, prompt, 1500, fastModel, { retries: 1 });
+      summary = await claudeJSON(INSTRUCTIONS, prompt, 2000, fastModel, { retries: 1 });
     } catch (err) {
       // The fast model can flake — not on the plan, an off-format reply, a transient blip. Fall back
       // to the default model once before giving up, so a weak fast model doesn't leave it unscored.
       console.error(`resume score: fast model failed (${err.message.slice(0, 120)}), retrying on default model`);
-      summary = await claudeJSON(INSTRUCTIONS, prompt, 1500);
+      summary = await claudeJSON(INSTRUCTIONS, prompt, 2000);
     }
     await q(`UPDATE applications SET ai_summary=$1, ai_status='DONE', updated_at=now() WHERE id=$2`, [
       summary,

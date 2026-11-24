@@ -52,20 +52,35 @@ async function call(body, { retries = 4 } = {}) {
 
 /** Ask Claude and parse a single JSON object back. Works on any model (no assistant prefill).
  *  `model` can override the default (e.g. a faster model for resume scoring). */
-export async function claudeJSON(system, prompt, maxTokens = 1500, model = MODEL, opts = {}) {
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set.');
-  const text = await call({
-    model: (model || MODEL).trim(),
-    max_tokens: maxTokens,
-    system: `${system}\n\nRespond with ONLY a single valid JSON object — no markdown, no code fences, no commentary before or after.`,
-    messages: [{ role: 'user', content: prompt }],
-  }, opts);
-  let raw = text.replace(/```json|```/g, '').trim();
+function extractJson(text) {
+  let raw = String(text).replace(/```json|```/g, '').trim();
   // Isolate the JSON object even if the model adds any stray text around it.
   const start = raw.indexOf('{');
   const end = raw.lastIndexOf('}');
   if (start >= 0 && end >= start) raw = raw.slice(start, end + 1);
   return JSON.parse(raw);
+}
+
+export async function claudeJSON(system, prompt, maxTokens = 1500, model = MODEL, opts = {}) {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set.');
+  const body = {
+    model: (model || MODEL).trim(),
+    max_tokens: maxTokens,
+    system: `${system}\n\nRespond with ONLY a single valid JSON object — no markdown, no code fences, no commentary before or after.`,
+    messages: [{ role: 'user', content: prompt }],
+  };
+  // A reply can occasionally come back off-format or cut short. A fresh generation almost always
+  // fixes it, so parse-and-retry once before giving up.
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const text = await call(body, opts);
+    try {
+      return extractJson(text);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw new Error(`Claude returned unparseable JSON: ${(lastErr && lastErr.message) || 'parse error'}`);
 }
 
 /** Ask Claude for a plain-text answer. */
