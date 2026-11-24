@@ -14,6 +14,7 @@ const ITEMS = [
   ['Added to WhatsApp group', ''],
   ['Handed over to Reporting Manager', ''],
   ['Induction completed', ''],
+  ['Uniform issued', ''],
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
