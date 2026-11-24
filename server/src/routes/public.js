@@ -390,6 +390,7 @@ r.post('/interview/:token/recording', videoUpload.single('video'), async (req, r
     const ext = (req.file.mimetype || '').includes('mp4') ? 'mp4' : 'webm';
     const key = `Employee Video Recording/${company}/${name}_${ref}.${ext}`;
     await putFile(key, req.file.buffer, req.file.mimetype || 'video/webm');
+    await q('UPDATE applications SET interview_recording_path=$1 WHERE id=$2', [key, app.id]);
     res.json({ ok: true });
   } catch (err) {
     console.error('interview recording save failed:', err.message);

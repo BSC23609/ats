@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import ResumeViewer from '../components/ResumeViewer.jsx';
+import RecordingViewer from '../components/RecordingViewer.jsx';
 import { api, PIPELINE, CLOSED, STATUS_LABEL, money, date, dateTime, scoreBand } from '../api.jsx';
 
 const Section = ({ title, children }) => (
@@ -217,6 +218,7 @@ export default function ApplicationDetail() {
   const [app, setApp] = useState(null);
   const [error, setError] = useState('');
   const [showResume, setShowResume] = useState(false);
+  const [showRecording, setShowRecording] = useState(false);
   const [msg, setMsg] = useState('');
   const [move, setMove] = useState({ status: '', note: '', interview_at: '', offered_ctc: '', date_of_joining: '', designation: '', department: '' });
   const [offer, setOffer] = useState({ offer_designation: '', offered_ctc: '', offer_joining_date: '' });
@@ -299,6 +301,9 @@ export default function ApplicationDetail() {
       {showResume && app.resume_filename && (
         <ResumeViewer applicationId={app.id} filename={app.resume_filename}
                       onClose={() => setShowResume(false)} />
+      )}
+      {showRecording && (
+        <RecordingViewer applicationId={app.id} onClose={() => setShowRecording(false)} />
       )}
       <div className="page-head">
         <div>
@@ -406,6 +411,11 @@ export default function ApplicationDetail() {
                   <span className="chip INTERVIEW_SCORE" style={{ marginLeft: 4 }}>
                     Score {Number(app.interview_score).toFixed(1)}/10
                   </span>
+                )}
+                {app.interview_recording_path && (
+                  <button className="ghost small" style={{ marginLeft: 4 }} onClick={() => setShowRecording(true)}>
+                    ▶ View recording
+                  </button>
                 )}
               </div>
             </Section>

@@ -228,6 +228,22 @@ r.get('/:id/resume', async (req, res, next) => {
   }
 });
 
+/** Stream the candidate's interview video recording (HR only), for in-app playback. */
+r.get('/:id/recording', async (req, res) => {
+  try {
+    const app = await one('SELECT company_id, interview_recording_path FROM applications WHERE id=$1', [req.params.id]);
+    if (!app?.interview_recording_path) return res.status(404).json({ error: 'No interview recording for this candidate.' });
+    if (!assertCompanyAccess(req, res, app.company_id)) return;
+    const buffer = await getFile(app.interview_recording_path);
+    const type = app.interview_recording_path.endsWith('.mp4') ? 'video/mp4' : 'video/webm';
+    res.setHeader('Content-Type', type);
+    res.setHeader('Content-Disposition', 'inline');
+    res.send(buffer);
+  } catch {
+    res.status(404).json({ error: 'That recording could not be retrieved from storage.' });
+  }
+});
+
 /** Re-run the AI overview (e.g. after adding an API key, or a failed read). */
 r.post('/:id/reanalyse', async (req, res) => {
   const app = await one(
