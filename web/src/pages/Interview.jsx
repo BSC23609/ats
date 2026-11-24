@@ -234,14 +234,22 @@ export default function Interview() {
       audioElRef.current.src = SILENT_WAV;
       audioElRef.current.play().catch(() => {});
     } catch { /* */ }
+    let stream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      streamRef.current = stream;
-      startVideoRecording(stream);   // record the whole session for the HR video archive
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     } catch {
-      setError('We could not access your camera and microphone. Please allow access and reload.');
+      setError('Your camera must be ON to begin. Please allow camera and microphone access, then reload and try again.');
       return;
     }
+    // Camera is compulsory: there must be a live, enabled video track, or the interview does not start.
+    const vids = stream.getVideoTracks();
+    if (!vids.length || vids[0].readyState !== 'live' || !vids[0].enabled) {
+      try { stream.getTracks().forEach((t) => t.stop()); } catch { /* */ }
+      setError('We could not detect an active camera. This interview can only start with the camera on — please turn your camera on and reload.');
+      return;
+    }
+    streamRef.current = stream;
+    startVideoRecording(stream);   // record the whole session for the HR video archive
     setPhase('speaking');
     // Start the overall 5-minute clock; when it runs out we stop the current answer and let the
     // server wrap up and score on that final submission.
@@ -299,7 +307,7 @@ export default function Interview() {
           </p>
           <ul className="sub" style={{ lineHeight: 1.9, marginTop: 14 }}>
             <li>You'll introduce yourself first (up to 90 seconds), then answer a few short questions.</li>
-            <li>Your camera and microphone will be used. The interview takes about 5 minutes.</li>
+            <li>Your camera must be ON for the entire interview — it is compulsory. Your microphone is also used.</li>
             <li>Find a quiet spot with a stable connection, and speak clearly.</li>
           </ul>
           {error && <div className="iv-err" style={{ marginTop: 14 }}>{error}</div>}
