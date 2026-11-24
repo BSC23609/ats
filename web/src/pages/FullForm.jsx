@@ -52,6 +52,19 @@ const PG_DEGREES = [
   'M.E', 'M.Tech', 'M.Sc', 'M.Com', 'M.A', 'MBA', 'MCA', 'M.Pharm', 'LLM', 'M.Ed', 'Ph.D', 'Other',
 ];
 
+// Specialisation / branch options for undergraduate & post-graduate degrees.
+const SPECIALISATIONS = [
+  'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering',
+  'Electrical & Electronics Engineering (EEE)', 'Electronics & Communication Engineering (ECE)',
+  'Computer Science Engineering (CSE)', 'Information Technology (IT)', 'Production Engineering',
+  'Industrial Engineering', 'Automobile Engineering', 'Metallurgical Engineering',
+  'Chemical Engineering', 'Instrumentation Engineering', 'Mechatronics Engineering',
+  'Aeronautical Engineering', 'Structural Engineering', 'Construction Engineering & Management',
+  'Commerce', 'Accounting & Finance', 'Business Administration', 'Marketing', 'Finance',
+  'Human Resources (HR)', 'Operations Management', 'Supply Chain & Logistics', 'Economics',
+  'Mathematics', 'Physics', 'Chemistry', 'Statistics', 'Computer Applications', 'Other',
+];
+
 /* Repeatable table blocks — children, siblings, emergency contacts, education, employment */
 function Rows({ label, cols, rows, setRows, blank, min = 1 }) {
   const update = (i, key, value) => setRows(rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
@@ -379,8 +392,10 @@ export default function FullForm() {
                      onChange={(e) => eduSet('ug', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.ug.college}
                      onChange={(e) => eduSet('ug', 'college', e.target.value)} />
-              <input placeholder="Specialisation / branch" value={edu.ug.specialisation}
-                     onChange={(e) => eduSet('ug', 'specialisation', e.target.value)} />
+              <select value={edu.ug.specialisation} onChange={(e) => eduSet('ug', 'specialisation', e.target.value)}>
+                <option value="" disabled>Specialisation</option>
+                {SPECIALISATIONS.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
               {yearSelect('ug', 'from', 'From year')}
               {yearSelect('ug', 'to', 'To year')}
             </div>
@@ -397,8 +412,10 @@ export default function FullForm() {
                      onChange={(e) => eduSet('pg', 'grade', e.target.value)} />
               <input placeholder="College name" value={edu.pg.college}
                      onChange={(e) => eduSet('pg', 'college', e.target.value)} />
-              <input placeholder="Specialisation / branch" value={edu.pg.specialisation}
-                     onChange={(e) => eduSet('pg', 'specialisation', e.target.value)} />
+              <select value={edu.pg.specialisation} onChange={(e) => eduSet('pg', 'specialisation', e.target.value)}>
+                <option value="" disabled>Specialisation</option>
+                {SPECIALISATIONS.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
               {yearSelect('pg', 'from', 'From year')}
               {yearSelect('pg', 'to', 'To year')}
             </div>
