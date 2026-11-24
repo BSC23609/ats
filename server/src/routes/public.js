@@ -17,6 +17,7 @@ const r = Router();
 
 // Audio clips from the AI interview (one short answer at a time), held in memory for transcription.
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
+const videoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 120 * 1024 * 1024 } });
 
 const ALLOWED = [
   'application/pdf',
@@ -368,6 +369,34 @@ r.post('/interview/:token/start', async (req, res) => {
  *  - after each later answer, ask the next question until the 5-minute cap or the questions run out;
  *  - then score the whole transcript and close.
  */
+/** Save the candidate's interview video recording to OneDrive, under
+ *  Employee Video Recording/<company>/<Name>_<ref>. One file per candidate (deterministic path +
+ *  replace), so re-uploads never create duplicate recordings. */
+r.post('/interview/:token/recording', videoUpload.single('video'), async (req, res) => {
+  try {
+    const app = await one(
+      `SELECT a.id, a.full_name, a.ref_code, c.code AS company_code
+         FROM applications a JOIN companies c ON c.id = a.company_id
+        WHERE a.interview_token = $1`,
+      [req.params.token]
+    );
+    if (!app) return res.status(404).json({ error: 'This interview link is not valid.' });
+    if (!req.file || !req.file.buffer || !req.file.buffer.length)
+      return res.status(400).json({ error: 'No recording received.' });
+
+    const company = safeName(app.company_code || 'Other');
+    const name = safeName(app.full_name || 'candidate');
+    const ref = safeName(app.ref_code || app.id);
+    const ext = (req.file.mimetype || '').includes('mp4') ? 'mp4' : 'webm';
+    const key = `Employee Video Recording/${company}/${name}_${ref}.${ext}`;
+    await putFile(key, req.file.buffer, req.file.mimetype || 'video/webm');
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('interview recording save failed:', err.message);
+    res.status(500).json({ error: 'Could not save the recording.' });
+  }
+});
+
 r.post('/interview/:token/answer', audioUpload.array('audio', 6), async (req, res) => {
   const app = await interviewApp(req.params.token);
   if (!app) return res.status(404).json({ error: 'This interview link is not valid.' });

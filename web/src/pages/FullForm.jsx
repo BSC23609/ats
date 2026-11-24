@@ -326,9 +326,9 @@ export default function FullForm() {
                 cols={[
                   { key: 'relation', label: 'Relationship (e.g. Elder brother)' },
                   { key: 'age', label: 'Age', type: 'number' },
-                  { key: 'gender', label: 'Gender', type: 'select', options: ['Female', 'Male'] },
+                  { key: 'gender', label: 'Gender' },
                   { key: 'occupation', label: 'Occupation / place' },
-                  { key: 'marital', label: 'Marital status', type: 'select', options: ['Single', 'Married'] },
+                  { key: 'marital', label: 'Marital status' },
                 ]}
                 rows={siblings} setRows={setSiblings}
                 blank={{ relation: '', age: '', gender: '', occupation: '', marital: '' }} />

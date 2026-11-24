@@ -73,6 +73,9 @@ export default function Interview() {
   const [introPhase, setIntroPhase] = useState(false);
   const videoRef = useRef(null);
   const audioElRef = useRef(null);  // one reusable <audio>, unlocked on the start click (mobile autoplay)
+  const vidRecRef = useRef(null);   // full-session video+audio recorder, saved to OneDrive at the end
+  const vidChunksRef = useRef([]);
+  const uploadedRef = useRef(false);
 
   // Attach the webcam stream once the <video> is on screen (it only renders once the interview starts).
   useEffect(() => {
@@ -92,10 +95,36 @@ export default function Interview() {
     // eslint-disable-line
   }, [token]);
 
+  // Record the whole interview (video + audio) and upload it once, at the end, to OneDrive.
+  const startVideoRecording = (stream) => {
+    try {
+      vidChunksRef.current = [];
+      uploadedRef.current = false;
+      let mime = 'video/webm';
+      if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) mime = '';
+      const vr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      vr.ondataavailable = (e) => { if (e.data && e.data.size) vidChunksRef.current.push(e.data); };
+      vr.onstop = () => {
+        if (uploadedRef.current) return;
+        uploadedRef.current = true;
+        const blob = new Blob(vidChunksRef.current, { type: 'video/webm' });
+        vidChunksRef.current = [];
+        if (!blob.size) return;
+        const form = new FormData();
+        form.append('video', blob, 'interview.webm');
+        api.upload(`/public/interview/${token}/recording`, form).catch(() => { /* best-effort */ });
+      };
+      vr.start(1000); // flush a chunk every second so little is lost if the tab closes
+      vidRecRef.current = vr;
+    } catch { /* recording is best-effort; the interview still works without it */ }
+  };
+
   const stopAll = () => {
     stopSegRef.current = true;
     clearTimeout(timerRef.current); clearInterval(countRef.current); clearInterval(overallRef.current);
     try { recRef.current && recRef.current.state !== 'inactive' && recRef.current.stop(); } catch { /* */ }
+    // Stop the full-session recorder first so its onstop assembles + uploads before the tracks end.
+    try { vidRecRef.current && vidRecRef.current.state !== 'inactive' && vidRecRef.current.stop(); } catch { /* */ }
     try { streamRef.current && streamRef.current.getTracks().forEach((t) => t.stop()); } catch { /* */ }
   };
 
@@ -208,6 +237,7 @@ export default function Interview() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
+      startVideoRecording(stream);   // record the whole session for the HR video archive
     } catch {
       setError('We could not access your camera and microphone. Please allow access and reload.');
       return;

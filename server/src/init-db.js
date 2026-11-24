@@ -31,6 +31,7 @@ export async function migrate() {
     `ALTER TABLE users        ADD COLUMN IF NOT EXISTS phone TEXT`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_error TEXT`,
     `ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_attempts INT DEFAULT 0`,
+    `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_recording_path TEXT`,
     // On-demand scoring: allow a NOT_SCORED state (resume on file, awaiting a manual "Score" click).
     `ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_ai_status_check`,
     `ALTER TABLE applications ADD CONSTRAINT applications_ai_status_check CHECK (ai_status IN ('PENDING','DONE','FAILED','SKIPPED','NOT_SCORED'))`,
