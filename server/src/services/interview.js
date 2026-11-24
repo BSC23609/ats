@@ -37,11 +37,7 @@ export async function generateQuestions({ position, company, intro, resumeText, 
   try {
     out = await claudeJSON(system, prompt, 1024, fastModel);
   } catch (err) {
-    if (/model/i.test(err.message) && /not.?found|does not exist|invalid|unknown|did you mean/i.test(err.message)) {
-      out = await claudeJSON(system, prompt, 1024);
-    } else {
-      throw err;
-    }
+    out = await claudeJSON(system, prompt, 1024); // fall back to the default model on any fast-model error
   }
   const questions = Array.isArray(out?.questions) ? out.questions.filter((x) => typeof x === 'string' && x.trim()) : [];
   if (!questions.length) throw new Error('No questions were generated.');
@@ -76,11 +72,7 @@ export async function scoreInterview({ position, company, jobDescription, transc
   try {
     out = await claudeJSON(system, prompt, 1024, fastModel);
   } catch (err) {
-    if (/model/i.test(err.message) && /not.?found|does not exist|invalid|unknown|did you mean/i.test(err.message)) {
-      out = await claudeJSON(system, prompt, 1024);
-    } else {
-      throw err;
-    }
+    out = await claudeJSON(system, prompt, 1024); // fall back to the default model on any fast-model error
   }
   let score = Number(out?.score);
   if (!Number.isFinite(score)) score = null;

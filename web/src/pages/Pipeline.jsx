@@ -13,6 +13,8 @@ function shortAiError(msg) {
   if (m.includes('no readable text') || m.includes('scanned') || m.includes('image-only')) return 'Scanned/image PDF — no text';
   if (m.includes('utf8') || m.includes('byte sequence') || m.includes('encoding')) return 'Resume text could not be read';
   if (m.includes('api key') || m.includes('permission') || m.includes('denied')) return 'AI not configured';
+  if (m.includes('model')) return 'AI model unavailable — retry';
+  if (m.includes('json') || m.includes('parse') || m.includes('format')) return 'AI reply unreadable — retry';
   return 'Could not score — retry';
 }
 

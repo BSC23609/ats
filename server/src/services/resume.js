@@ -207,11 +207,10 @@ export async function summariseResume(
     try {
       summary = await claudeJSON(INSTRUCTIONS, prompt, 1500, fastModel);
     } catch (err) {
-      if (/model/i.test(err.message) && /not.?found|does not exist|invalid|unknown|did you mean/i.test(err.message)) {
-        summary = await claudeJSON(INSTRUCTIONS, prompt, 1500); // default model
-      } else {
-        throw err;
-      }
+      // The fast model can flake — not on the plan, an off-format reply, a transient blip. Fall back
+      // to the default model once before giving up, so a weak fast model doesn't leave it unscored.
+      console.error(`resume score: fast model failed (${err.message.slice(0, 120)}), retrying on default model`);
+      summary = await claudeJSON(INSTRUCTIONS, prompt, 1500);
     }
     await q(`UPDATE applications SET ai_summary=$1, ai_status='DONE', updated_at=now() WHERE id=$2`, [
       summary,
