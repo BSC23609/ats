@@ -457,7 +457,7 @@ export async function whatsappFirstInterview(appId) {
       { name: '1', value: app.full_name || 'Candidate' },
       { name: '2', value: app.position_applied || '' },
       { name: '3', value: app.company_name || '' },
-      { name: 'link', value: app.interview_token },
+      { name: '4', value: app.interview_token },   // dynamic URL button variable {{4}}
     ], 'ats_interview');
   } catch (e) { return { sent: false, reason: e.message }; }
 }
@@ -509,7 +509,7 @@ export async function whatsappJoined(appId) {
     return await sendTemplate(app.phone, process.env.WATI_TEMPLATE_JOINED, [
       { name: '1', value: app.full_name || 'Candidate' },
       { name: '2', value: app.company_name || '' },
-      { name: 'link', value: app.stage2_token },
+      { name: '3', value: app.stage2_token },   // dynamic URL button variable {{3}}
     ], 'ats_joined');
   } catch (e) { return { sent: false, reason: e.message }; }
 }
