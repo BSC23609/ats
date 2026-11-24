@@ -54,11 +54,15 @@ export async function scoreInterview({ position, company, jobDescription, transc
     .join('\n');
 
   const system =
-    `You are a hiring panel scoring a first-round screening interview for the "${position}" role at ${company}. ` +
-    `Judge only what the candidate actually said — their relevance to the role, clarity, depth and any red flags. ` +
-    `Transcripts come from speech-to-text and may contain minor transcription errors; do not penalise wording. ` +
-    `Use the whole 0-10 scale; most real first-round candidates land between 4 and 7. A very short or evasive ` +
-    `interview should score low.\n` +
+    `You are scoring a BRIEF first-round screening interview for the "${position}" role at ${company}. ` +
+    `The whole interview is only about five minutes: a short self-introduction, then a few questions each answered in ` +
+    `up to 30 seconds. Answers are therefore meant to be short — do NOT lower the score just because an answer is brief; ` +
+    `judge the substance, not the length. ` +
+    `Transcripts come from speech-to-text and may contain errors — never penalise wording, grammar or transcription slips. ` +
+    `Judge only what the candidate actually said: is it relevant to the role, clear, and does it show real experience or understanding. ` +
+    `Calibrate on a 0-10 scale: a candidate who introduces themselves clearly and answers the questions relevantly should ` +
+    `score about 6-8; give 8-10 for strong, specific, confident answers; 4-5 when answers are vague or thin on substance; ` +
+    `below 4 only when answers are off-topic, evasive, empty, or show a clear red flag. Be fair — do not cluster candidates at the low end.\n` +
     `Return JSON: {"score": number (0-10, one decimal), "summary": "2-3 sentences", ` +
     `"strengths": ["..."], "concerns": ["..."], "recommendation": "PROCEED" | "MAYBE" | "REJECT"}`;
 
