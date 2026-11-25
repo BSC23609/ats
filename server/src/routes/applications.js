@@ -309,10 +309,18 @@ r.post('/:id/notify', async (req, res, next) => {
 /** Re-score every resume that previously failed (runs in the background, paced to avoid rate limits). */
 r.post('/rescore-failed', async (req, res, next) => {
   try {
+    // A manual "Score all pending" is a deliberate human action after a fix, so clear the per-row
+    // attempt counter: every unscored resume — including ones that hit the retry cap — gets a fresh
+    // chance. Rows already scored DONE are left alone.
+    await q(
+      `UPDATE applications SET ai_attempts = 0
+         WHERE ai_status IN ('FAILED', 'PENDING', 'NOT_SCORED', 'SKIPPED')
+           AND resume_path IS NOT NULL`
+    );
     const { rows } = await q(
       `SELECT count(*)::int AS n FROM applications
          WHERE ai_status IN ('FAILED', 'PENDING', 'NOT_SCORED', 'SKIPPED')
-           AND resume_path IS NOT NULL AND COALESCE(ai_attempts, 0) < 8`
+           AND resume_path IS NOT NULL`
     );
     rescoreFailed(500).catch((e) => console.error('manual rescore error:', e.message));
     res.json({ queued: rows[0].n });
