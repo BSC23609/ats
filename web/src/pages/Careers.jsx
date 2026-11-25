@@ -207,18 +207,18 @@ export default function Careers() {
 
             <div className="field-row">
               <div className="field">
-                <label htmlFor="total_experience">Total experience (years)</label>
-                <input id="total_experience" name="total_experience" type="number" step="0.5" min="0" defaultValue="0" />
+                <label htmlFor="total_experience">Total experience (years) <span className="req">*</span></label>
+                <input id="total_experience" name="total_experience" type="number" step="0.5" min="0" defaultValue="0" required />
               </div>
               <div className="field">
-                <label htmlFor="notice_period_days">Notice period (days)</label>
-                <input id="notice_period_days" name="notice_period_days" type="number" min="0" />
+                <label htmlFor="notice_period_days">Notice period (days) <span className="req">*</span></label>
+                <input id="notice_period_days" name="notice_period_days" type="number" min="0" required />
               </div>
             </div>
 
             <div className="field-row">
               <div className="field">
-                <label htmlFor="current_salary_type">Current annual salary (₹)</label>
+                <label htmlFor="current_salary_type">Current annual salary (₹) <span className="req">*</span></label>
                 <select id="current_salary_type" value={fresher ? 'Fresher' : 'Experienced'}
                         onChange={(e) => setFresher(e.target.value === 'Fresher')}>
                   <option value="Experienced">Experienced</option>
@@ -227,19 +227,19 @@ export default function Careers() {
                 {fresher ? (
                   <input type="hidden" name="current_ctc" value="0" />
                 ) : (
-                  <input id="current_ctc" name="current_ctc" type="number" min="0"
+                  <input id="current_ctc" name="current_ctc" type="number" min="0" required
                          placeholder="e.g. 300000" style={{ marginTop: 8 }} />
                 )}
               </div>
               <div className="field">
-                <label htmlFor="expected_ctc">Expected annual salary (₹)</label>
-                <input id="expected_ctc" name="expected_ctc" type="number" min="0" />
+                <label htmlFor="expected_ctc">Expected annual salary (₹) <span className="req">*</span></label>
+                <input id="expected_ctc" name="expected_ctc" type="number" min="0" required />
               </div>
             </div>
 
             <div className="field">
-              <label htmlFor="resume">Resume — PDF or Word, up to 8 MB</label>
-              <input id="resume" type="file" accept=".pdf,.doc,.docx,.txt"
+              <label htmlFor="resume">Resume — PDF or Word, up to 8 MB <span className="req">*</span></label>
+              <input id="resume" type="file" accept=".pdf,.doc,.docx,.txt" required
                      onChange={(e) => setFile(e.target.files[0] || null)} />
               <p className="sub" style={{ marginTop: 6 }}>
                 Attach a resume and our team sees a structured overview of your background straight away.
