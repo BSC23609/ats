@@ -15,6 +15,7 @@ const ITEMS = [
   ['Handed over to Reporting Manager', ''],
   ['Induction completed', ''],
   ['Uniform issued', ''],
+  ['ID Card issued', ''],
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
