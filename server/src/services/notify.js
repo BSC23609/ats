@@ -298,7 +298,7 @@ export async function emailAiInterview(appId) {
         <p>Dear ${esc(app.full_name)},</p>
         <p>
           Thank you for applying for <strong>${esc(app.position_applied)}</strong> at
-          ${esc(app.company_name)}. As the first step, we would like you to complete a short
+          ${esc(app.company_name)}. As the first step, we would like you to complete a
           <strong>short video interview</strong>. It takes about five minutes.
         </p>
         <p style="margin:6px 0 0"><strong>Before you start:</strong></p>
